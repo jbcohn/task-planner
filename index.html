@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#12161a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>PG Task Planner</title>
+    
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="lib/leaflet.css">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div id="app-viewport">
+        <!-- Toast Notification -->
+        <div id="toast-notification"></div>
+
+        <!-- Top Floating Header Bar -->
+        <header id="top-bar">
+            <div class="top-bar-left">
+                <div class="brand-title">🪂 <span class="brand-text"><span>PG</span> Planner</span></div>
+                <div class="distance-badge" title="Optimized CIVL Task Distance / Target">
+                    <span class="distance-label">Opt:</span>
+                    <span class="distance-val" id="distance-val">0.0 km</span>
+                    <span class="delta-tag" id="delta-tag">+0.0 km</span>
+                </div>
+            </div>
+
+            <div class="top-bar-right">
+                <input type="file" id="waypoint-file-input" accept=".cup,.wpt" style="display: none;">
+                <button class="icon-btn" id="btn-upload-waypoints" title="Upload Waypoint File (.cup / .wpt)">
+                    📂
+                </button>
+                <button class="icon-btn" id="btn-draw-task" title="Freehand Draw Task">
+                    ✏️
+                </button>
+                <button class="icon-btn active" id="btn-toggle-labels" title="Cycle Waypoint Labels: Codes / Names / Off">
+                    🏷️
+                </button>
+
+                <!-- History Navigation Pill -->
+                <div class="history-pill" title="Cycle through generated unique options">
+                    <button class="icon-btn-sm" id="btn-history-prev" title="Previous Option (Back)" disabled>◀</button>
+                    <span id="history-counter" class="history-counter">1/1</span>
+                    <button class="icon-btn-sm" id="btn-history-next" title="Next Option (Forward)" disabled>▶</button>
+                </div>
+
+                <button class="icon-btn" id="btn-randomize" title="Randomize Task Now (Generates New Option)">
+                    🎲
+                </button>
+                <button class="icon-btn" id="btn-open-randomize-settings" title="Randomization Settings">
+                    ⚙️
+                </button>
+                <button class="icon-btn" id="btn-open-share" title="Share Task & XCTrack QR Code">
+                    📤
+                </button>
+                <button class="icon-btn" id="btn-open-offline" title="Offline Map Tiles">
+                    🗺️
+                </button>
+            </div>
+        </header>
+
+        <!-- Map Container -->
+        <div id="map"></div>
+
+        <!-- Freehand Drawing Canvas Overlay -->
+        <canvas id="draw-canvas"></canvas>
+
+        <!-- Drawing Mode Banner -->
+        <div id="drawing-banner" class="drawing-banner" style="display: none;">
+            <span>✏️ Draw path across turnpoints...</span>
+            <button id="btn-cancel-draw">Cancel</button>
+        </div>
+
+        <!-- Floating Touchpoint Alternatives Panel -->
+        <div id="reverse-cycle-panel">
+            <div class="reverse-cycle-header">
+                <div class="reverse-cycle-title">
+                    🎯 Touchpoint Route Alternatives
+                </div>
+                <span id="candidate-counter" style="font-size: 11px; color: var(--text-secondary);">1 / 1</span>
+            </div>
+            <div class="reverse-cycle-body">
+                <button class="btn-secondary" id="btn-candidate-prev" style="padding: 6px 12px;">◀ Prev</button>
+                <div class="reverse-candidate-info">
+                    <div class="candidate-name" id="candidate-name">-</div>
+                    <div class="candidate-details" id="candidate-details">-</div>
+                </div>
+                <button class="btn-secondary" id="btn-candidate-next" style="padding: 6px 12px;">Next ▶</button>
+                <button class="btn-primary" id="btn-candidate-accept" style="padding: 6px 14px;">Done</button>
+                <button class="btn-secondary" id="btn-candidate-cancel" style="padding: 6px 12px; color: var(--accent-red);">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Slide-Up Bottom Sheet for Task Details & Turnpoints -->
+        <div id="bottom-sheet">
+            <div class="sheet-header">
+                <div class="sheet-handle"></div>
+                <div class="sheet-title-bar">
+                    <div class="sheet-title">
+                        📋 Task Turnpoints
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <label style="font-size: 12px; color: var(--text-secondary);">Target:</label>
+                        <input type="number" id="input-target-dist" step="1" min="5" max="500" 
+                               style="width: 54px; background: #12161a; border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; padding: 2px 4px; font-weight: 700;">
+                        <span style="font-size: 12px; color: var(--text-secondary);">km</span>
+
+                        <div class="history-pill" title="Cycle through generated unique options">
+                            <button class="icon-btn-sm" id="btn-sheet-prev" title="Previous Option" disabled>◀</button>
+                            <span id="sheet-history-counter" class="history-counter">1/1</span>
+                            <button class="icon-btn-sm" id="btn-sheet-next" title="Next Option" disabled>▶</button>
+                        </div>
+
+                        <button class="icon-btn" id="btn-sheet-randomize" title="Generate New Option" style="width: 30px; height: 30px; font-size: 15px;">🎲</button>
+                        <button class="icon-btn" id="btn-sheet-settings" title="Randomization Settings" style="width: 30px; height: 30px; font-size: 15px;">⚙️</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Multi-selection batch edit bar -->
+            <div id="multiselect-toolbar" class="multiselect-toolbar" style="display: none;">
+                <div class="multiselect-header">
+                    <div class="multiselect-count" id="multiselect-count">0 selected</div>
+                    <div class="multiselect-actions">
+                        <button class="btn-xs" id="btn-ms-select-all" title="Select all turnpoints">Select All</button>
+                        <button class="btn-xs" id="btn-ms-invert" title="Invert selection">Invert</button>
+                        <button class="btn-xs btn-accent" id="btn-ms-reverse" title="Reverse order of selected turnpoints">Reverse ⇅</button>
+                        <button class="btn-xs btn-accent" id="btn-ms-duplicate" title="Duplicate selected turnpoints">Duplicate ＋</button>
+                        <button class="btn-xs" id="btn-ms-lock" title="Toggle lock on selected">Lock/Unlock</button>
+                        <button class="btn-xs btn-danger" id="btn-ms-delete" title="Delete selected">Delete ✕</button>
+                        <button class="btn-xs" id="btn-ms-clear" title="Clear selection">✕</button>
+                    </div>
+                </div>
+                <div id="multiselect-props" class="multiselect-props"></div>
+            </div>
+
+            <div class="sheet-content">
+                <div class="turnpoint-list" id="turnpoints-container">
+                    <!-- Turnpoint cards dynamically injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Separate Randomization Settings Modal -->
+    <div class="modal-backdrop" id="modal-randomize-settings">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3>⚙️ Randomization Settings</h3>
+                <button class="icon-btn" id="btn-close-randomize-settings">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Target Optimized Distance (km):</label>
+                    <input type="number" id="solver-target-distance" class="form-control" value="65" step="1" min="10" max="500">
+                </div>
+                <div class="form-group">
+                    <label>Distance Tolerance (± km):</label>
+                    <input type="number" id="solver-distance-tolerance" class="form-control" value="0.5" step="0.1" min="0.1" max="10.0">
+                    <small style="color: var(--text-secondary); font-size: 11px;">Allowed variation from target distance (default ±0.5 km)</small>
+                </div>
+                <div class="form-group">
+                    <label>Number of Turnpoints (N):</label>
+                    <input type="number" id="solver-tp-count" class="form-control" value="5" step="1" min="3" max="15">
+                </div>
+                <div class="form-group">
+                    <label>🚀 Launch (Code starts with 'T'):</label>
+                    <div style="display: flex; gap: 8px; margin-bottom: 6px;">
+                        <input type="text" id="launch-search-input" class="form-control" placeholder="🔍 Search T-waypoint..." style="flex: 2; padding: 4px 8px; font-size: 12px;">
+                        <select id="launch-sort-select" class="form-control" style="flex: 1; padding: 4px 6px; font-size: 12px;">
+                            <option value="alpha">Code A-Z</option>
+                            <option value="dist">By Distance</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <select id="solver-launch-select" class="form-control" style="flex: 1;"></select>
+                        <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; white-space: nowrap; color: var(--text-primary);">
+                            <input type="checkbox" id="solver-lock-launch" checked style="accent-color: var(--accent-blue); cursor: pointer;"> 🔒 Lock at Start
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>🏁 Goal (Code starts with 'G'):</label>
+                    <div style="display: flex; gap: 8px; margin-bottom: 6px;">
+                        <input type="text" id="goal-search-input" class="form-control" placeholder="🔍 Search G-waypoint..." style="flex: 2; padding: 4px 8px; font-size: 12px;">
+                        <select id="goal-sort-select" class="form-control" style="flex: 1; padding: 4px 6px; font-size: 12px;">
+                            <option value="alpha">Code A-Z</option>
+                            <option value="dist">Dist from Launch</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <select id="solver-goal-select" class="form-control" style="flex: 1;"></select>
+                        <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; white-space: nowrap; color: var(--text-primary);">
+                            <input type="checkbox" id="solver-lock-goal" checked style="accent-color: var(--accent-blue); cursor: pointer;"> 🔒 Lock at End
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <label>Similarity Overlap Threshold:</label>
+                        <span id="label-overlap-val" style="color: var(--accent-blue); font-weight: 700; font-size: 14px;">80%</span>
+                    </div>
+                    <input type="range" id="solver-overlap-percent" min="20" max="100" step="5" value="80" style="width: 100%; margin: 6px 0;">
+                    <small style="color: var(--text-secondary); font-size: 11px;">Tasks sharing ≥ this % of route with an existing option are treated as identical.</small>
+                </div>
+                <div class="form-group">
+                    <label>Optimized Route Line Color:</label>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                        <div class="route-color-swatches" id="route-color-swatches" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button type="button" class="color-swatch-btn active" data-color="#0f172a" style="background: #0f172a;" title="Dark Charcoal (Default)"></button>
+                            <button type="button" class="color-swatch-btn" data-color="#1e3a8a" style="background: #1e3a8a;" title="Deep Navy Blue"></button>
+                            <button type="button" class="color-swatch-btn" data-color="#991b1b" style="background: #991b1b;" title="Crimson Red"></button>
+                            <button type="button" class="color-swatch-btn" data-color="#065f46" style="background: #065f46;" title="Forest Green"></button>
+                            <button type="button" class="color-swatch-btn" data-color="#581c87" style="background: #581c87;" title="Purple"></button>
+                            <button type="button" class="color-swatch-btn" data-color="#ffffff" style="background: #ffffff;" title="Crisp White"></button>
+                        </div>
+                        <input type="color" id="setting-route-line-color" value="#0f172a" style="width: 32px; height: 30px; padding: 0; border: 1px solid var(--border-color); border-radius: 4px; background: transparent; cursor: pointer;" title="Custom Color">
+                    </div>
+                </div>
+                <div style="background: #151a1f; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+                    <strong style="color: var(--text-primary);">Constraints Enforced:</strong><br>
+                    • Tolerance: ±<span id="summary-tolerance-val">0.5</span> km of target distance<br>
+                    • Similarity: Overlap ≥ <span id="summary-overlap-val">80</span>% treated as duplicate<br>
+                    • Radii: 400m to 300km (discrete 2 sig-figs)<br>
+                    • Deflection Angles: 20° to 160° (no acute hairpins)<br>
+                    • Minimum Leg Length: ≥ 30% of average leg<br>
+                    • Locked turnpoints (🔒) remain strictly fixed<br>
+                    • <strong>New Option Guarantee</strong>: Generates only unique, unseen combinations
+                </div>
+                <button class="btn-primary" id="btn-save-randomize-settings" style="padding: 12px;">Save & Apply Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share & XCTrack QR Modal -->
+    <div class="modal-backdrop" id="modal-share">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3>📤 Share Task & XCTrack QR</h3>
+                <button class="icon-btn" id="btn-close-share">✕</button>
+            </div>
+            <div style="display: flex; border-bottom: 1px solid var(--border-color);">
+                <button id="tab-btn-qr" class="btn-secondary active" style="flex: 1; border-radius: 0; border: none; border-bottom: 2px solid var(--accent-blue);">Show QR Code</button>
+                <button id="tab-btn-scan" class="btn-secondary" style="flex: 1; border-radius: 0; border: none;">Scan QR</button>
+            </div>
+            <div class="modal-body">
+                <div id="tab-qr-content">
+                    <div style="display: flex; justify-content: center; padding: 10px 0;">
+                        <div id="qrcode-display" style="background: white; padding: 12px; border-radius: 8px;"></div>
+                    </div>
+                    <p style="text-align: center; font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+                        Point your instrument (XCTrack / Flyskyhy / Oudie) at this QR code to scan the task.
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <button class="btn-primary" id="btn-native-share">Share via Messaging (WhatsApp / Telegram)</button>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-secondary" id="btn-export-xctsk" style="flex: 1;">Save .xctsk</button>
+                            <button class="btn-secondary" id="btn-export-cup" style="flex: 1;">Export .cup</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-scan-content" style="display: none;">
+                    <div id="camera-scanner-view" style="width: 100%; min-height: 250px; background: #000; border-radius: 8px;"></div>
+                    <p style="text-align: center; font-size: 12px; color: var(--text-secondary); margin-top: 10px;">
+                        Point camera at a task QR code (paper task sheet or another pilot's phone).
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Styles & Offline Storage Modal -->
+    <div class="modal-backdrop" id="modal-offline">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3>🗺️ Map Style & Offline Storage</h3>
+                <button class="icon-btn" id="btn-close-offline">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600;">Choose Map Style:</label>
+                    <div id="map-style-selector" style="display: flex; flex-direction: column; gap: 6px;">
+                        <label class="map-style-opt">
+                            <input type="radio" name="map-style" value="opentopo" checked>
+                            <span class="map-style-title">⛰️ OpenTopoMap</span>
+                            <span class="map-style-desc">Detailed topographic contours & labeled peaks</span>
+                        </label>
+                        <label class="map-style-opt">
+                            <input type="radio" name="map-style" value="esritopo">
+                            <span class="map-style-title">🗺️ ESRI World Topo</span>
+                            <span class="map-style-desc">Vivid shaded elevation relief & terrain contours</span>
+                        </label>
+                        <label class="map-style-opt">
+                            <input type="radio" name="map-style" value="satellite">
+                            <span class="map-style-title">🛰️ Satellite (Aerial Imagery)</span>
+                            <span class="map-style-desc">Photographic terrain & landing zones</span>
+                        </label>
+                        <label class="map-style-opt">
+                            <input type="radio" name="map-style" value="cyclosm">
+                            <span class="map-style-title">🚲 CyclOSM</span>
+                            <span class="map-style-desc">Outdoor topographic terrain</span>
+                        </label>
+                        <label class="map-style-opt">
+                            <input type="radio" name="map-style" value="osm">
+                            <span class="map-style-title">📍 OpenStreetMap</span>
+                            <span class="map-style-desc">Standard street & road basemap</span>
+                        </label>
+                    </div>
+                </div>
+
+                <hr style="border: none; border-top: 1px solid var(--border-color); margin: 12px 0;">
+
+                <div style="display: flex; justify-content: space-between; align-items: center; background: #151a1f; padding: 10px 12px; border-radius: 8px;">
+                    <span>Cached Offline Tiles:</span>
+                    <strong id="offline-tile-count" style="color: var(--accent-green);">0 tiles</strong>
+                </div>
+                <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-top: 8px;">
+                    Pan and zoom the map to your flying area, then tap <strong>Cache Visible Area</strong> to download tiles (zooms 9 to 13) into device storage. The map will then work 100% offline without mobile data.
+                </p>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="cache-progress-fill"></div>
+                </div>
+                <div id="cache-status-text" style="font-size: 11px; color: var(--text-secondary);">Ready</div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-primary" id="btn-cache-area" style="flex: 1;">Cache Visible Area</button>
+                    <button class="btn-secondary" id="btn-clear-tiles" style="color: var(--accent-red);">Clear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vendor Libraries -->
+    <script src="lib/leaflet.js"></script>
+    <script src="lib/qrcode.min.js"></script>
+    <script src="lib/html5-qrcode.min.js"></script>
+
+    <!-- Main Module Application -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
