@@ -265,19 +265,47 @@ body, html {
     width: 68px;
 }
 
-.sheet-swipe-hint {
-    font-size: 11px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.65);
-    margin-top: 3px;
-    letter-spacing: 0.2px;
-}
-
 .sheet-title-bar {
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: space-between;
+}
+
+.sheet-title-btn {
+    background: #1c242d;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 18px;
+    padding: 6px 14px;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    transition: all 0.18s ease;
+    user-select: none;
+}
+
+.sheet-title-btn:hover {
+    background: #25303c;
+    border-color: #38bdf8;
+    box-shadow: 0 3px 10px rgba(56, 189, 248, 0.25);
+    transform: translateY(-1px);
+}
+
+.sheet-title-btn:active {
+    transform: translateY(1px);
+    background: #171e26;
+}
+
+.sheet-toggle-arrow {
+    font-size: 10px;
+    color: #38bdf8;
+    display: inline-block;
+    transition: transform 0.2s ease;
 }
 
 .sheet-title {
@@ -286,6 +314,75 @@ body, html {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+/* Focus Mode Banner (Single Turnpoint View) */
+.focus-mode-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, #0d1a29, #172433);
+    border: 1px solid #38bdf8;
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+    gap: 10px;
+}
+
+.focus-mode-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.focus-mode-badge {
+    background: #0284c7;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.focus-mode-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.focus-mode-hint {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.btn-exit-focus {
+    background: #dc2626;
+    color: #ffffff !important;
+    border: none;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.4);
+}
+
+.btn-exit-focus:hover {
+    background: #ef4444;
+    transform: translateY(-1px);
+}
+
+#bottom-sheet.sheet-focus-mode {
+    max-height: 52vh !important;
 }
 
 .sheet-content {
@@ -1355,6 +1452,11 @@ input[type=range] {
 
     .sheet-header {
         padding: 6px 14px 12px;
+    }
+
+    .sheet-title-btn {
+        font-size: 14px;
+        padding: 6px 12px;
     }
 
     .sheet-title {

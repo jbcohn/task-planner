@@ -65,7 +65,8 @@ export class MapController {
         onCutPointSelected, 
         onFreehandStrokeComplete,
         onToggleTurnpointSelection,
-        onRemoveTurnpoint
+        onRemoveTurnpoint,
+        onFocusTurnpoint
     }) {
         this.mapElementId = mapElementId;
         this.drawCanvasId = drawCanvasId;
@@ -77,6 +78,7 @@ export class MapController {
         this.onFreehandStrokeComplete = onFreehandStrokeComplete;
         this.onToggleTurnpointSelection = onToggleTurnpointSelection;
         this.onRemoveTurnpoint = onRemoveTurnpoint;
+        this.onFocusTurnpoint = onFocusTurnpoint;
 
         this.showWaypointLabels = true;
         this.labelMode = (typeof localStorage !== 'undefined' && localStorage.getItem('pg_label_mode')) || 'codes';
@@ -693,6 +695,7 @@ export class MapController {
                 <div class="wp-popup-elev">Alt: ${wp.elev || 0}m ${tp.direction ? '• Direction: ' + tp.direction.toUpperCase() : ''}</div>
                 ${wp.desc ? `<div class="wp-popup-desc">${wp.desc}</div>` : ''}
                 <div class="wp-popup-actions" style="margin-top: 8px;">
+                    <button class="wp-popup-btn" id="btn-tp-focus-${idx}" style="background: #0284c7; color: #ffffff; font-weight: 700;">🔍 Focus / Edit Radius</button>
                     ${isIntermediate ? `<button class="wp-popup-btn wp-btn-cutpoint" id="btn-tp-cutpoint-${idx}">🎯 Touchpoint Alternatives</button>` : ''}
                     <button class="wp-popup-btn wp-btn-add" id="btn-tp-add-again-${idx}">+ Add Waypoint Again</button>
                     <button class="wp-popup-btn" style="background: #2a333d;" id="btn-tp-select-toggle-${idx}">${isSelected ? '✓ Deselect' : '☑️ Select'}</button>
@@ -732,6 +735,16 @@ export class MapController {
                     centerMarker.closePopup();
                     if (this.onToggleTurnpointSelection) {
                         this.onToggleTurnpointSelection(idx);
+                    }
+                });
+            }
+
+            const btnFocus = tpPopupContent.querySelector(`#btn-tp-focus-${idx}`);
+            if (btnFocus) {
+                btnFocus.addEventListener('click', () => {
+                    centerMarker.closePopup();
+                    if (this.onFocusTurnpoint) {
+                        this.onFocusTurnpoint(idx);
                     }
                 });
             }
@@ -810,7 +823,25 @@ export class MapController {
         this.map.fitBounds(L.latLngBounds(coords), { padding: [60, 60] });
     }
 
-    focusTurnpoint(lat, lng, zoom = 12) {
-        this.map.setView([lat, lng], zoom);
+    focusTurnpoint(target, lng, zoom = 12) {
+        if (typeof target === 'number' && typeof lng !== 'number') {
+            const idx = target;
+            if (!this.currentTurnpoints || !this.currentTurnpoints[idx]) return;
+            const tp = this.currentTurnpoints[idx];
+            const wp = tp.waypoint;
+            const radiusM = Math.max(tp.radius || 400, 600);
+            const circle = L.circle([wp.lat, wp.lng], { radius: radiusM });
+            const bounds = circle.getBounds();
+            this.map.fitBounds(bounds, {
+                paddingTopLeft: [50, 50],
+                paddingBottomRight: [50, 220],
+                maxZoom: 15,
+                animate: true
+            });
+        } else if (typeof target === 'number' && typeof lng === 'number') {
+            this.map.setView([target, lng], zoom);
+        } else if (target && typeof target.lat === 'number') {
+            this.map.setView([target.lat, target.lng], lng || zoom);
+        }
     }
 }

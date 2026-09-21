@@ -11,7 +11,9 @@ export class TaskSheet {
         onSetTurnpoints,
         onSelectionChange,
         onOpenCutPointAlternatives,
-        onCloseCutPointAlternatives
+        onCloseCutPointAlternatives,
+        onFocusTurnpoint,
+        onExitFocus
     }) {
         this.container = document.getElementById(containerId);
         this.onUpdateTurnpoint = onUpdateTurnpoint;
@@ -23,9 +25,12 @@ export class TaskSheet {
         this.onSelectionChange = onSelectionChange;
         this.onOpenCutPointAlternatives = onOpenCutPointAlternatives;
         this.onCloseCutPointAlternatives = onCloseCutPointAlternatives;
+        this.onFocusTurnpoint = onFocusTurnpoint;
+        this.onExitFocus = onExitFocus;
 
         this.turnpoints = [];
         this.selectedIndices = new Set();
+        this.focusedIndex = null;
 
         this.reverseCyclePanel = document.getElementById('reverse-cycle-panel');
         this.candidateList = [];
@@ -72,12 +77,22 @@ export class TaskSheet {
 
     initMultiSelectToolbar() {
         const btnSelectAll = document.getElementById('btn-ms-select-all');
+        const btnFocus = document.getElementById('btn-ms-focus');
         const btnInvert = document.getElementById('btn-ms-invert');
         const btnReverse = document.getElementById('btn-ms-reverse');
         const btnDuplicate = document.getElementById('btn-ms-duplicate');
         const btnLock = document.getElementById('btn-ms-lock');
         const btnDelete = document.getElementById('btn-ms-delete');
         const btnClear = document.getElementById('btn-ms-clear');
+
+        if (btnFocus) {
+            btnFocus.addEventListener('click', () => {
+                if (this.selectedIndices.size === 1) {
+                    const idx = Array.from(this.selectedIndices)[0];
+                    this.setFocusedTurnpoint(idx);
+                }
+            });
+        }
 
         if (btnSelectAll) {
             btnSelectAll.addEventListener('click', () => {
@@ -211,6 +226,28 @@ export class TaskSheet {
         this.renderSelectionState();
     }
 
+    setFocusedTurnpoint(idx) {
+        if (idx < 0 || idx >= this.turnpoints.length) return;
+        this.focusedIndex = idx;
+        this.selectedIndices = new Set([idx]);
+        const bottomSheet = document.getElementById('bottom-sheet');
+        if (bottomSheet) bottomSheet.classList.add('sheet-focus-mode');
+        if (this.onFocusTurnpoint) {
+            this.onFocusTurnpoint(idx);
+        }
+        this.render();
+    }
+
+    exitFocusMode() {
+        this.focusedIndex = null;
+        const bottomSheet = document.getElementById('bottom-sheet');
+        if (bottomSheet) bottomSheet.classList.remove('sheet-focus-mode');
+        if (this.onExitFocus) {
+            this.onExitFocus();
+        }
+        this.render();
+    }
+
     renderSelectionState() {
         // Update cards highlight
         const cards = this.container.querySelectorAll('.tp-card');
@@ -225,7 +262,7 @@ export class TaskSheet {
         const toolbar = document.getElementById('multiselect-toolbar');
         if (!toolbar) return;
 
-        if (this.selectedIndices.size === 0) {
+        if (this.selectedIndices.size === 0 || this.focusedIndex !== null) {
             toolbar.style.display = 'none';
             return;
         }
@@ -238,6 +275,11 @@ export class TaskSheet {
             countEl.textContent = `${this.selectedIndices.size} Selected (${indicesStr})`;
         }
 
+        const btnFocus = document.getElementById('btn-ms-focus');
+        if (btnFocus) {
+            btnFocus.style.display = (this.selectedIndices.size === 1) ? 'inline-flex' : 'none';
+        }
+
         // Shared Properties Editor
         const propsEl = document.getElementById('multiselect-props');
         if (!propsEl) return;
@@ -245,8 +287,6 @@ export class TaskSheet {
         const selectedTps = sorted.map(i => this.turnpoints[i]);
         const allCylinders = selectedTps.every(t => !t.goalType || t.goalType === 'cylinder');
         const allLines = selectedTps.every(t => t.type === 'goal' && t.goalType === 'line');
-
-        const discreteRadii = getDiscrete2SigFigValues(400, 300000);
 
         if (allCylinders) {
             const firstR = selectedTps[0].radius || 400;
@@ -262,17 +302,17 @@ export class TaskSheet {
                     <div class="radius-chip ${sameRadius && firstR === 400 ? 'active' : ''}" data-radius="400">400m</div>
                     <div class="radius-chip ${sameRadius && firstR === 1000 ? 'active' : ''}" data-radius="1000">1km</div>
                     <div class="radius-chip ${sameRadius && firstR === 2000 ? 'active' : ''}" data-radius="2000">2km</div>
-                    <div class="radius-chip ${sameRadius && firstR === 3000 ? 'active' : ''}" data-radius="3000">3km</div>
                     <div class="radius-chip ${sameRadius && firstR === 5000 ? 'active' : ''}" data-radius="5000">5km</div>
                     <div class="radius-chip ${sameRadius && firstR === 10000 ? 'active' : ''}" data-radius="10000">10km</div>
-                    <div class="radius-chip ${sameRadius && firstR === 20000 ? 'active' : ''}" data-radius="20000">20km</div>
+                    <div class="radius-chip ${sameRadius && firstR === 50000 ? 'active' : ''}" data-radius="50000">50km</div>
+                    <div class="radius-chip ${sameRadius && firstR === 100000 ? 'active' : ''}" data-radius="100000">100km</div>
                 </div>
                 <div class="radius-stepper-row">
-                    <button type="button" class="radius-step-btn" data-step="-10000" title="Decrease radius by 10 km">-10km</button>
-                    <button type="button" class="radius-step-btn" data-step="-1000" title="Decrease radius by 1 km">-1km</button>
                     <button type="button" class="radius-step-btn" data-step="-100" title="Decrease radius by 100 m">-100m</button>
                     <button type="button" class="radius-step-btn" data-step="100" title="Increase radius by 100 m">+100m</button>
+                    <button type="button" class="radius-step-btn" data-step="-1000" title="Decrease radius by 1 km">-1km</button>
                     <button type="button" class="radius-step-btn" data-step="1000" title="Increase radius by 1 km">+1km</button>
+                    <button type="button" class="radius-step-btn" data-step="-10000" title="Decrease radius by 10 km">-10km</button>
                     <button type="button" class="radius-step-btn" data-step="10000" title="Increase radius by 10 km">+10km</button>
                 </div>
             `;
@@ -319,8 +359,13 @@ export class TaskSheet {
         let r = (currentR || 400) + step;
         if (r < 100) r = 100;
         if (r > 300000) r = 300000;
-        if (Math.abs(step) === 100 && r < 10000) {
+        const absStep = Math.abs(step);
+        if (absStep === 100 && r <= 10000) {
             return Math.round(r / 100) * 100;
+        } else if (absStep === 1000 && r <= 50000) {
+            return Math.round(r / 1000) * 1000;
+        } else if (absStep === 10000) {
+            return Math.round(r / 10000) * 10000;
         }
         return roundTo2SigFigs(r);
     }
@@ -408,7 +453,9 @@ export class TaskSheet {
     }
 
     render(turnpoints, optimized) {
-        this.turnpoints = turnpoints || [];
+        if (turnpoints !== undefined) {
+            this.turnpoints = turnpoints || [];
+        }
         if (!this.container) return;
 
         // Prune out-of-range selected indices
@@ -416,6 +463,15 @@ export class TaskSheet {
             if (idx >= this.turnpoints.length) {
                 this.selectedIndices.delete(idx);
             }
+        }
+
+        if (this.focusedIndex !== null && (this.focusedIndex < 0 || this.focusedIndex >= this.turnpoints.length)) {
+            this.focusedIndex = null;
+        }
+
+        const bottomSheet = document.getElementById('bottom-sheet');
+        if (bottomSheet) {
+            bottomSheet.classList.toggle('sheet-focus-mode', this.focusedIndex !== null);
         }
 
         this.container.innerHTML = '';
@@ -431,7 +487,38 @@ export class TaskSheet {
             return;
         }
 
-        this.turnpoints.forEach((tp, idx) => {
+        // Render Focus Mode Banner if in single turnpoint focus mode
+        if (this.focusedIndex !== null) {
+            const focusedTp = this.turnpoints[this.focusedIndex];
+            const focusedWp = focusedTp.waypoint;
+            const focusedCode = focusedWp.code || focusedWp.id || '';
+            const focusedName = (focusedWp.name && focusedWp.name !== focusedCode) ? focusedWp.name : '';
+
+            const banner = document.createElement('div');
+            banner.className = 'focus-mode-banner';
+            banner.innerHTML = `
+                <div class="focus-mode-info">
+                    <span class="focus-mode-badge">FOCUS MODE</span>
+                    <span class="focus-mode-title">#${this.focusedIndex + 1} ${focusedCode} ${focusedName}</span>
+                    <span class="focus-mode-hint">• Map visible above</span>
+                </div>
+                <button type="button" class="btn-exit-focus" id="btn-exit-focus" title="Exit single turnpoint focus and show all">
+                    ✕ Show All Turnpoints
+                </button>
+            `;
+            this.container.appendChild(banner);
+            banner.querySelector('#btn-exit-focus').addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.exitFocusMode();
+            });
+        }
+
+        const indicesToRender = this.focusedIndex !== null 
+            ? [this.focusedIndex] 
+            : this.turnpoints.map((_, i) => i);
+
+        indicesToRender.forEach((idx) => {
+            const tp = this.turnpoints[idx];
             const wp = tp.waypoint;
             const card = document.createElement('div');
             const isSelected = this.selectedIndices.has(idx);
@@ -458,6 +545,9 @@ export class TaskSheet {
                         </div>
                     </div>
                     <div class="tp-actions">
+                        <button class="btn-lock ${this.focusedIndex === idx ? 'active' : ''}" id="btn-focus-tp-${idx}" title="${this.focusedIndex === idx ? 'Exit single turnpoint view' : 'Show only this turnpoint to see changes on map'}" style="font-size: 12px; ${this.focusedIndex === idx ? 'background: #0284c7; color: #ffffff;' : ''}">
+                            ${this.focusedIndex === idx ? '✕ Exit' : '🔍 Focus'}
+                        </button>
                         ${isIntermediate ? `<button class="btn-lock" id="btn-cutpoint-${idx}" title="🎯 Find route alternatives through this touchpoint" style="font-size: 13px;">🎯</button>` : ''}
                         <button class="btn-lock" id="btn-rnd-tp-${idx}" title="Randomize this waypoint" style="font-size: 13px;">🎲</button>
                         <button class="btn-lock ${tp.locked ? 'locked' : ''}" id="btn-lock-${idx}" title="${tp.locked ? 'Unlock turnpoint' : 'Lock turnpoint for randomizer'}">
@@ -489,18 +579,18 @@ export class TaskSheet {
                     <div class="radius-chip ${radiusM === 400 ? 'active' : ''}" data-radius="400">400m</div>
                     <div class="radius-chip ${radiusM === 1000 ? 'active' : ''}" data-radius="1000">1km</div>
                     <div class="radius-chip ${radiusM === 2000 ? 'active' : ''}" data-radius="2000">2km</div>
-                    <div class="radius-chip ${radiusM === 3000 ? 'active' : ''}" data-radius="3000">3km</div>
                     <div class="radius-chip ${radiusM === 5000 ? 'active' : ''}" data-radius="5000">5km</div>
                     <div class="radius-chip ${radiusM === 10000 ? 'active' : ''}" data-radius="10000">10km</div>
-                    <div class="radius-chip ${radiusM === 20000 ? 'active' : ''}" data-radius="20000">20km</div>
+                    <div class="radius-chip ${radiusM === 50000 ? 'active' : ''}" data-radius="50000">50km</div>
+                    <div class="radius-chip ${radiusM === 100000 ? 'active' : ''}" data-radius="100000">100km</div>
                 </div>
 
                 <div class="radius-stepper-row">
-                    <button type="button" class="radius-step-btn" data-step="-10000" title="Decrease radius by 10 km">-10km</button>
-                    <button type="button" class="radius-step-btn" data-step="-1000" title="Decrease radius by 1 km">-1km</button>
                     <button type="button" class="radius-step-btn" data-step="-100" title="Decrease radius by 100 m">-100m</button>
                     <button type="button" class="radius-step-btn" data-step="100" title="Increase radius by 100 m">+100m</button>
+                    <button type="button" class="radius-step-btn" data-step="-1000" title="Decrease radius by 1 km">-1km</button>
                     <button type="button" class="radius-step-btn" data-step="1000" title="Increase radius by 1 km">+1km</button>
+                    <button type="button" class="radius-step-btn" data-step="-10000" title="Decrease radius by 10 km">-10km</button>
                     <button type="button" class="radius-step-btn" data-step="10000" title="Increase radius by 10 km">+10km</button>
                 </div>
             `;
@@ -527,6 +617,19 @@ export class TaskSheet {
                 }
                 this.handleSelectionUpdated();
             });
+
+            // Focus button
+            const focusBtn = card.querySelector(`#btn-focus-tp-${idx}`);
+            if (focusBtn) {
+                focusBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (this.focusedIndex === idx) {
+                        this.exitFocusMode();
+                    } else {
+                        this.setFocusedTurnpoint(idx);
+                    }
+                });
+            }
 
             // Cut-point button
             const cutBtn = card.querySelector(`#btn-cutpoint-${idx}`);
@@ -562,6 +665,11 @@ export class TaskSheet {
             const delBtn = card.querySelector(`#btn-del-${idx}`);
             delBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                if (this.focusedIndex === idx) {
+                    this.exitFocusMode();
+                } else if (this.focusedIndex > idx) {
+                    this.focusedIndex--;
+                }
                 if (this.onRemoveTurnpoint) this.onRemoveTurnpoint(idx);
             });
 
@@ -623,7 +731,7 @@ export class TaskSheet {
                 });
             });
 
-            // Radius Stepper Buttons (-10km, -1km, -100m, +100m, +1km, +10km)
+            // Radius Stepper Buttons (-100m, +100m, -1km, +1km, -10km, +10km)
             card.querySelectorAll('.radius-step-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();

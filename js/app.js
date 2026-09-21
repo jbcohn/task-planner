@@ -60,7 +60,8 @@ class App {
             onCutPointSelected: (idx, cutPoint) => this.handleCutPointSelected(idx, cutPoint),
             onFreehandStrokeComplete: (stroke) => this.handleFreehandComplete(stroke),
             onToggleTurnpointSelection: (idx) => this.toggleTurnpointSelection(idx),
-            onRemoveTurnpoint: (idx) => this.removeTurnpoint(idx)
+            onRemoveTurnpoint: (idx) => this.removeTurnpoint(idx),
+            onFocusTurnpoint: (idx) => this.taskSheet.setFocusedTurnpoint(idx)
         });
         this.mapController.init();
 
@@ -75,7 +76,9 @@ class App {
             onSetTurnpoints: (turnpoints, selectedIndices) => this.setAllTurnpoints(turnpoints, selectedIndices),
             onSelectionChange: (selectedIndices) => this.handleSelectionChange(selectedIndices),
             onOpenCutPointAlternatives: (idx) => this.openCutPointAlternativesForTurnpoint(idx),
-            onCloseCutPointAlternatives: () => this.mapController.clearActiveCutPoint()
+            onCloseCutPointAlternatives: () => this.mapController.clearActiveCutPoint(),
+            onFocusTurnpoint: (idx) => this.handleFocusTurnpoint(idx),
+            onExitFocus: () => this.handleExitFocus()
         });
 
         this.setupSearchableDropdowns();
@@ -522,7 +525,9 @@ class App {
         // Bottom Sheet Expand / Collapse Toggle & Swipe Gestures
         const sheetHeader = document.querySelector('.sheet-header');
         const bottomSheet = document.getElementById('bottom-sheet');
-        const swipeHint = document.getElementById('sheet-swipe-hint');
+        const sheetTitleBtn = document.getElementById('sheet-title-btn');
+        const sheetToggleArrow = document.getElementById('sheet-toggle-arrow');
+
         if (sheetHeader && bottomSheet) {
             let expanded = false;
 
@@ -532,19 +537,29 @@ class App {
                     bottomSheet.classList.add('expanded');
                     bottomSheet.classList.remove('collapsed');
                     bottomSheet.style.transform = 'translateY(0)';
-                    if (swipeHint) swipeHint.textContent = '▼ Swipe down to collapse';
+                    if (sheetToggleArrow) sheetToggleArrow.textContent = '▼';
                 } else {
                     bottomSheet.classList.remove('expanded');
                     bottomSheet.classList.add('collapsed');
                     bottomSheet.style.transform = 'translateY(calc(100% - 68px))';
-                    if (swipeHint) swipeHint.textContent = '▲ Swipe up for Task List';
+                    if (sheetToggleArrow) sheetToggleArrow.textContent = '▲';
                 }
             };
+
+            this.updateSheetState = updateSheetState;
 
             // Set initial state
             updateSheetState(false);
 
-            // Click / Tap handler on header
+            // Title Button click toggle
+            if (sheetTitleBtn) {
+                sheetTitleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    updateSheetState(!expanded);
+                });
+            }
+
+            // Click / Tap handler on header background
             sheetHeader.addEventListener('click', (e) => {
                 if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return;
                 updateSheetState(!expanded);
@@ -812,6 +827,17 @@ class App {
 
     handleSelectionChange(selectedIndices) {
         this.mapController.setSelectedTurnpoints(selectedIndices);
+    }
+
+    handleFocusTurnpoint(idx) {
+        if (this.updateSheetState) {
+            this.updateSheetState(true);
+        }
+        this.mapController.focusTurnpoint(idx);
+    }
+
+    handleExitFocus() {
+        // Exiting focus mode restores all turnpoint cards
     }
 
     openCutPointAlternativesForTurnpoint(idx) {
