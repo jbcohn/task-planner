@@ -1,5 +1,4 @@
-// task-planner/js/ui/task-sheet.js
-import { formatRadiusDisplay, roundTo2SigFigs, getDiscrete2SigFigValues } from '../geo-math.js';
+import { formatRadiusDisplay, roundTo2SigFigs } from '../geo-math.js';
 
 export class TaskSheet {
     constructor({
@@ -268,12 +267,13 @@ export class TaskSheet {
                     <div class="radius-chip ${sameRadius && firstR === 10000 ? 'active' : ''}" data-radius="10000">10km</div>
                     <div class="radius-chip ${sameRadius && firstR === 20000 ? 'active' : ''}" data-radius="20000">20km</div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 10px; color: var(--text-secondary);">400m</span>
-                    <input type="range" min="0" max="${discreteRadii.length - 1}" 
-                           value="${sameRadius && discreteRadii.indexOf(firstR) !== -1 ? discreteRadii.indexOf(firstR) : 0}" 
-                           id="batch-radius-slider" style="flex: 1; accent-color: var(--accent-blue); cursor: pointer;">
-                    <span style="font-size: 10px; color: var(--text-secondary);">300km</span>
+                <div class="radius-stepper-row">
+                    <button type="button" class="radius-step-btn" data-step="-10000" title="Decrease radius by 10 km">-10km</button>
+                    <button type="button" class="radius-step-btn" data-step="-1000" title="Decrease radius by 1 km">-1km</button>
+                    <button type="button" class="radius-step-btn" data-step="-100" title="Decrease radius by 100 m">-100m</button>
+                    <button type="button" class="radius-step-btn" data-step="100" title="Increase radius by 100 m">+100m</button>
+                    <button type="button" class="radius-step-btn" data-step="1000" title="Increase radius by 1 km">+1km</button>
+                    <button type="button" class="radius-step-btn" data-step="10000" title="Increase radius by 10 km">+10km</button>
                 </div>
             `;
 
@@ -284,18 +284,12 @@ export class TaskSheet {
                 });
             });
 
-            const slider = propsEl.querySelector('#batch-radius-slider');
-            if (slider) {
-                slider.addEventListener('input', (e) => {
-                    const r = discreteRadii[parseInt(e.target.value, 10)];
-                    const badge = propsEl.querySelector('#batch-radius-badge');
-                    if (badge) badge.textContent = formatRadiusDisplay(r);
+            propsEl.querySelectorAll('.radius-step-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const step = parseInt(btn.getAttribute('data-step'), 10);
+                    this.applyBatchRadiusStep(step);
                 });
-                slider.addEventListener('change', (e) => {
-                    const r = discreteRadii[parseInt(e.target.value, 10)];
-                    this.applyBatchRadius(r);
-                });
-            }
+            });
         } else if (allLines) {
             propsEl.innerHTML = `
                 <div style="font-size: 11px; color: var(--text-secondary);">All selected are Goal Lines (fixed width 200m).</div>
@@ -313,6 +307,29 @@ export class TaskSheet {
         const updated = this.turnpoints.map((tp, idx) => {
             if (this.selectedIndices.has(idx)) {
                 return { ...tp, radius: newRadius };
+            }
+            return tp;
+        });
+        if (this.onSetTurnpoints) {
+            this.onSetTurnpoints(updated, this.selectedIndices);
+        }
+    }
+
+    calculateSteppedRadius(currentR, step) {
+        let r = (currentR || 400) + step;
+        if (r < 100) r = 100;
+        if (r > 300000) r = 300000;
+        if (Math.abs(step) === 100 && r < 10000) {
+            return Math.round(r / 100) * 100;
+        }
+        return roundTo2SigFigs(r);
+    }
+
+    applyBatchRadiusStep(step) {
+        const updated = this.turnpoints.map((tp, idx) => {
+            if (this.selectedIndices.has(idx) && tp.goalType !== 'line') {
+                const nextR = this.calculateSteppedRadius(tp.radius, step);
+                return { ...tp, radius: nextR };
             }
             return tp;
         });
@@ -414,8 +431,6 @@ export class TaskSheet {
             return;
         }
 
-        const discreteRadii = getDiscrete2SigFigValues(400, 300000);
-
         this.turnpoints.forEach((tp, idx) => {
             const wp = tp.waypoint;
             const card = document.createElement('div');
@@ -480,11 +495,13 @@ export class TaskSheet {
                     <div class="radius-chip ${radiusM === 20000 ? 'active' : ''}" data-radius="20000">20km</div>
                 </div>
 
-                <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
-                    <span style="font-size: 10px; color: var(--text-secondary);">400m</span>
-                    <input type="range" min="0" max="${discreteRadii.length - 1}" value="${discreteRadii.indexOf(radiusM) !== -1 ? discreteRadii.indexOf(radiusM) : 0}" 
-                           id="radius-slider-${idx}" style="flex: 1; accent-color: var(--accent-blue); cursor: pointer;">
-                    <span style="font-size: 10px; color: var(--text-secondary);">300km</span>
+                <div class="radius-stepper-row">
+                    <button type="button" class="radius-step-btn" data-step="-10000" title="Decrease radius by 10 km">-10km</button>
+                    <button type="button" class="radius-step-btn" data-step="-1000" title="Decrease radius by 1 km">-1km</button>
+                    <button type="button" class="radius-step-btn" data-step="-100" title="Decrease radius by 100 m">-100m</button>
+                    <button type="button" class="radius-step-btn" data-step="100" title="Increase radius by 100 m">+100m</button>
+                    <button type="button" class="radius-step-btn" data-step="1000" title="Increase radius by 1 km">+1km</button>
+                    <button type="button" class="radius-step-btn" data-step="10000" title="Increase radius by 10 km">+10km</button>
                 </div>
             `;
 
@@ -606,20 +623,14 @@ export class TaskSheet {
                 });
             });
 
-            // Slider
-            const slider = card.querySelector(`#radius-slider-${idx}`);
-            slider.addEventListener('input', (e) => {
-                const discreteIndex = parseInt(e.target.value, 10);
-                const r = discreteRadii[discreteIndex];
-                tp.radius = r;
-                const badge = card.querySelector(`#radius-badge-${idx}`);
-                if (badge) badge.textContent = formatRadiusDisplay(r);
-            });
-
-            slider.addEventListener('change', (e) => {
-                const discreteIndex = parseInt(e.target.value, 10);
-                tp.radius = discreteRadii[discreteIndex];
-                if (this.onUpdateTurnpoint) this.onUpdateTurnpoint(idx, tp);
+            // Radius Stepper Buttons (-10km, -1km, -100m, +100m, +1km, +10km)
+            card.querySelectorAll('.radius-step-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const step = parseInt(btn.getAttribute('data-step'), 10);
+                    tp.radius = this.calculateSteppedRadius(tp.radius, step);
+                    if (this.onUpdateTurnpoint) this.onUpdateTurnpoint(idx, tp);
+                });
             });
 
             this.container.appendChild(card);

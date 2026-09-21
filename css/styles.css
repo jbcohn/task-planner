@@ -235,16 +235,42 @@ body, html {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 8px 16px 4px 16px;
+    padding: 6px 16px 8px 16px;
+    cursor: pointer;
+    user-select: none;
+    touch-action: pan-y;
+}
+
+.sheet-handle-zone {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 0 6px 0;
     cursor: pointer;
 }
 
 .sheet-handle {
-    width: 38px;
-    height: 4px;
-    background: var(--border-color);
-    border-radius: 2px;
-    margin-bottom: 8px;
+    width: 56px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.45);
+    border-radius: 3px;
+    transition: background 0.2s, width 0.2s;
+}
+
+.sheet-header:hover .sheet-handle,
+.sheet-header:active .sheet-handle {
+    background: rgba(255, 255, 255, 0.8);
+    width: 68px;
+}
+
+.sheet-swipe-hint {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.65);
+    margin-top: 3px;
+    letter-spacing: 0.2px;
 }
 
 .sheet-title-bar {
@@ -326,7 +352,7 @@ body, html {
 .multiselect-count {
     font-size: 12px;
     font-weight: 700;
-    color: var(--accent-blue);
+    color: #ffffff;
 }
 
 .multiselect-actions {
@@ -342,13 +368,21 @@ body, html {
     color: var(--text-primary);
     font-size: 11px;
     padding: 3px 8px;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: all 0.15s ease;
 }
 
 .btn-xs:hover {
-    background: #374351;
+    background: #36414e;
+    color: #ffffff;
+}
+
+.btn-select-all {
+    background: #182330;
+    border-color: rgba(255, 255, 255, 0.35);
+    color: #ffffff;
+    font-weight: 600;
 }
 
 .btn-xs.btn-accent {
@@ -461,11 +495,12 @@ body, html {
 .radius-badge {
     font-weight: 700;
     font-size: 13px;
-    color: var(--accent-blue);
-    background: #0d1e30;
-    padding: 3px 8px;
+    color: #ffffff !important;
+    background: #1c242e;
+    padding: 3px 9px;
     border-radius: 12px;
-    border: 1px solid #163658;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    letter-spacing: 0.2px;
 }
 
 /* Quick Radius Chips */
@@ -480,7 +515,7 @@ body, html {
 .radius-chip {
     background: #151a1f;
     border: 1px solid var(--border-color);
-    color: var(--text-secondary);
+    color: #f1f5f9;
     border-radius: 14px;
     padding: 4px 10px;
     font-size: 11px;
@@ -492,8 +527,46 @@ body, html {
 
 .radius-chip.active, .radius-chip:hover {
     background: var(--accent-blue);
-    color: white;
+    color: #ffffff;
     border-color: var(--accent-blue);
+}
+
+/* Radius Increment / Decrement Stepper Buttons */
+.radius-stepper-row {
+    display: flex;
+    gap: 5px;
+    width: 100%;
+    margin-top: 4px;
+}
+
+.radius-step-btn {
+    flex: 1;
+    min-height: 32px;
+    background: #182028;
+    border: 1px solid var(--border-color);
+    color: #ffffff !important;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    user-select: none;
+    padding: 4px 2px;
+    white-space: nowrap;
+}
+
+.radius-step-btn:hover {
+    background: var(--bg-card-hover);
+    border-color: rgba(255, 255, 255, 0.45);
+    transform: translateY(-1px);
+}
+
+.radius-step-btn:active {
+    background: var(--accent-blue);
+    transform: translateY(0);
 }
 
 /* Reverse Cycling Floating Panel */
@@ -522,7 +595,7 @@ body, html {
 .reverse-cycle-title {
     font-weight: 700;
     font-size: 13px;
-    color: var(--accent-blue);
+    color: #ffffff;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -690,7 +763,8 @@ input[type=range] {
 
 .wp-popup-elev {
     font-size: 12px;
-    color: var(--accent-blue);
+    color: #ffffff;
+    font-weight: 600;
     margin-bottom: 6px;
 }
 
@@ -780,7 +854,7 @@ input[type=range] {
 
 .wp-map-label .wp-code {
     font-weight: 700;
-    color: #38bdf8;
+    color: #ffffff;
 }
 
 .wp-map-label .wp-fullname {
@@ -891,7 +965,7 @@ input[type=range] {
 
 .tp-map-label.tp-turnpoint {
     border: 2px solid #0284c7 !important;
-    color: #38bdf8 !important;
+    color: #ffffff !important;
 }
 
 .tp-map-label.tp-ess {
@@ -910,11 +984,11 @@ input[type=range] {
 
 .tp-code-badge {
     display: inline-block;
-    background: rgba(2, 132, 199, 0.2);
-    color: var(--accent-blue);
-    border: 1px solid rgba(2, 132, 199, 0.4);
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.35);
     border-radius: 3px;
-    padding: 0 4px;
+    padding: 0 5px;
     font-size: 11px;
     font-weight: 700;
     margin-right: 4px;
@@ -1120,7 +1194,7 @@ input[type=range] {
 .history-counter {
     font-size: 11px;
     font-weight: 700;
-    color: var(--accent-blue);
+    color: #ffffff;
     padding: 0 4px;
     min-width: 28px;
     text-align: center;
@@ -1225,7 +1299,7 @@ input[type=range] {
         left: 8px;
         right: 8px;
         padding: 0 8px;
-        height: 48px;
+        height: 52px;
         gap: 6px;
     }
 
@@ -1234,16 +1308,16 @@ input[type=range] {
     }
 
     .brand-title {
-        font-size: 16px;
+        font-size: 18px;
     }
 
     .distance-badge {
-        padding: 2px 6px;
-        gap: 4px;
+        padding: 3px 8px;
+        gap: 5px;
     }
 
     .distance-val {
-        font-size: 13px;
+        font-size: 15px;
     }
 
     .distance-label {
@@ -1255,22 +1329,136 @@ input[type=range] {
     }
 
     .icon-btn {
-        width: 32px;
-        height: 32px;
-        font-size: 13px;
+        width: 38px;
+        height: 38px;
+        font-size: 17px;
     }
 
     .history-pill {
-        padding: 1px 3px;
+        padding: 2px 4px;
     }
 
     .history-counter {
-        font-size: 10px;
-        min-width: 20px;
+        font-size: 12px;
+        min-width: 22px;
+    }
+
+    .sheet-handle-zone {
+        height: 28px;
+        padding-top: 8px;
+    }
+
+    .sheet-handle {
+        width: 60px;
+        height: 6px;
+    }
+
+    .sheet-header {
+        padding: 6px 14px 12px;
+    }
+
+    .sheet-title {
+        font-size: 16px;
+    }
+
+    .sheet-badge {
+        font-size: 12px;
+        padding: 3px 8px;
+    }
+
+    .sheet-actions .btn {
+        font-size: 13px;
+        padding: 6px 12px;
+    }
+
+    .tp-item {
+        padding: 10px 12px;
+        gap: 8px;
+    }
+
+    .tp-idx {
+        font-size: 14px;
+        width: 24px;
+        height: 24px;
+        line-height: 24px;
+    }
+
+    .tp-name {
+        font-size: 15px;
+    }
+
+    .tp-code-badge {
+        font-size: 12px;
+        padding: 1px 6px;
+    }
+
+    .radius-badge {
+        font-size: 13px;
+        padding: 3px 8px;
+    }
+
+    .type-select {
+        font-size: 13px;
+        padding: 5px 8px;
+        min-height: 32px;
+    }
+
+    .radius-chip {
+        font-size: 12px;
+        padding: 5px 9px;
+        min-height: 30px;
+    }
+
+    .radius-stepper-row {
+        gap: 6px;
+        margin-top: 6px;
+    }
+
+    .radius-step-btn {
+        min-height: 36px;
+        font-size: 12px;
+    }
+
+    .tp-item .icon-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+
+    .multiselect-count {
+        font-size: 13px;
+    }
+
+    .btn-xs {
+        font-size: 12px;
+        padding: 5px 10px;
+    }
+
+    .wp-map-label {
+        font-size: 12px !important;
+        padding: 3px 7px !important;
+    }
+
+    .tp-map-label {
+        font-size: 13px !important;
+        padding: 3px 8px !important;
+    }
+
+    .leaflet-bar a {
+        width: 38px !important;
+        height: 38px !important;
+        line-height: 38px !important;
+        font-size: 16px !important;
+    }
+
+    .leaflet-control-layers-toggle {
+        width: 38px !important;
+        height: 38px !important;
     }
 
     .leaflet-top.leaflet-right {
-        margin-top: 64px !important;
+        margin-top: 68px !important;
         margin-right: 8px !important;
     }
 }
+

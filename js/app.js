@@ -519,16 +519,83 @@ class App {
             });
         }
 
-        // Bottom Sheet Expand / Collapse Toggle
+        // Bottom Sheet Expand / Collapse Toggle & Swipe Gestures
         const sheetHeader = document.querySelector('.sheet-header');
         const bottomSheet = document.getElementById('bottom-sheet');
+        const swipeHint = document.getElementById('sheet-swipe-hint');
         if (sheetHeader && bottomSheet) {
             let expanded = false;
+
+            const updateSheetState = (isExpanded) => {
+                expanded = isExpanded;
+                if (expanded) {
+                    bottomSheet.classList.add('expanded');
+                    bottomSheet.classList.remove('collapsed');
+                    bottomSheet.style.transform = 'translateY(0)';
+                    if (swipeHint) swipeHint.textContent = '▼ Swipe down to collapse';
+                } else {
+                    bottomSheet.classList.remove('expanded');
+                    bottomSheet.classList.add('collapsed');
+                    bottomSheet.style.transform = 'translateY(calc(100% - 68px))';
+                    if (swipeHint) swipeHint.textContent = '▲ Swipe up for Task List';
+                }
+            };
+
+            // Set initial state
+            updateSheetState(false);
+
+            // Click / Tap handler on header
             sheetHeader.addEventListener('click', (e) => {
-                if (e.target.closest('button') || e.target.closest('input')) return;
-                expanded = !expanded;
-                bottomSheet.style.transform = expanded ? 'translateY(0)' : 'translateY(calc(100% - 70px))';
+                if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return;
+                updateSheetState(!expanded);
             });
+
+            // Touch Swipe handling (Swipe up to expand, swipe down to collapse)
+            let touchStartY = 0;
+            let touchStartX = 0;
+            let touchStartTime = 0;
+            let isSwiping = false;
+
+            sheetHeader.addEventListener('touchstart', (e) => {
+                if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return;
+                if (e.touches && e.touches.length === 1) {
+                    touchStartY = e.touches[0].clientY;
+                    touchStartX = e.touches[0].clientX;
+                    touchStartTime = Date.now();
+                    isSwiping = true;
+                }
+            }, { passive: true });
+
+            sheetHeader.addEventListener('touchmove', (e) => {
+                if (!isSwiping || !e.touches || e.touches.length !== 1) return;
+                const currentY = e.touches[0].clientY;
+                const diffY = currentY - touchStartY;
+                if (Math.abs(diffY) > 8 && e.cancelable) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            sheetHeader.addEventListener('touchend', (e) => {
+                if (!isSwiping) return;
+                isSwiping = false;
+                if (!e.changedTouches || e.changedTouches.length === 0) return;
+
+                const endY = e.changedTouches[0].clientY;
+                const endX = e.changedTouches[0].clientX;
+                const diffY = endY - touchStartY;
+                const diffX = endX - touchStartX;
+
+                // Check for vertical swipe gesture
+                if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 20) {
+                    if (diffY < -20) {
+                        // Swiped UP -> expand
+                        updateSheetState(true);
+                    } else if (diffY > 20) {
+                        // Swiped DOWN -> collapse
+                        updateSheetState(false);
+                    }
+                }
+            }, { passive: true });
         }
     }
 
