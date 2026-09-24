@@ -1,5 +1,5 @@
 // task-planner/sw.js
-const CACHE_NAME = 'pg-task-planner-v7';
+const CACHE_NAME = 'pg-task-planner-v8';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',

@@ -221,15 +221,24 @@ export function solveRandomizedTask({
                     goalType: 'cylinder',
                     locked: true
                 });
+            } else if (existing && existing.type && existing.type !== 'sss') {
+                template.push({
+                    waypoint: (existing.locked && existing.waypoint) ? existing.waypoint : null,
+                    radius: existing.radius || 400,
+                    type: 'turnpoint',
+                    direction: 'enter',
+                    goalType: 'cylinder',
+                    locked: !!existing.locked
+                });
             } else {
                 const launchWp = (isLaunchLocked && launchTp && launchTp.waypoint) ? launchTp.waypoint : null;
                 template.push({
                     waypoint: launchWp,
-                    radius: 2000,
+                    radius: (existing && existing.radius) ? existing.radius : 2000,
                     type: 'sss',
-                    direction: 'exit',
+                    direction: (existing && existing.direction) ? existing.direction : 'exit',
                     goalType: 'cylinder',
-                    locked: !!launchWp
+                    locked: existing ? !!existing.locked : false
                 });
             }
         } else if (i === N - 2 && N >= 5) {
@@ -244,15 +253,24 @@ export function solveRandomizedTask({
                     goalType: 'cylinder',
                     locked: true
                 });
+            } else if (existing && existing.type && existing.type !== 'ess') {
+                template.push({
+                    waypoint: (existing.locked && existing.waypoint) ? existing.waypoint : null,
+                    radius: existing.radius || 400,
+                    type: 'turnpoint',
+                    direction: 'enter',
+                    goalType: 'cylinder',
+                    locked: !!existing.locked
+                });
             } else {
                 const goalWp = (isGoalLocked && goalTp && goalTp.waypoint) ? goalTp.waypoint : null;
                 template.push({
                     waypoint: goalWp,
-                    radius: 2000,
+                    radius: (existing && existing.radius) ? existing.radius : 2000,
                     type: 'ess',
-                    direction: 'enter',
+                    direction: (existing && existing.direction) ? existing.direction : 'enter',
                     goalType: 'cylinder',
-                    locked: !!goalWp
+                    locked: existing ? !!existing.locked : false
                 });
             }
         } else {
@@ -304,9 +322,10 @@ export function solveRandomizedTask({
         }
     }
 
-    const maxDeflection = isOutAndReturn ? 175 : 160;
+    const maxDeflection = isOutAndReturn ? 180 : 160;
 
     const validSolutions = [];
+    const fineSolutions = [];
     const bestFallbackSolutions = [];
 
     // Fast Single-Turnpoint Path
@@ -385,9 +404,33 @@ export function solveRandomizedTask({
                     const sinHalf = Math.sin((angObj * Math.PI / 180) / 2);
                     const neededR = (overshootKm * 1000) / (2 * Math.max(0.2, sinHalf));
                     const discreteR = roundTo2SigFigs(Math.min(neededR, 50000));
-                    if (discreteR >= 400) {
-                        candidateTask[idx].radius = discreteR;
-                        opt = optimizeTaskRoute(candidateTask);
+                    let bestR = discreteR >= 400 ? discreteR : 400;
+                    candidateTask[idx].radius = bestR;
+                    opt = optimizeTaskRoute(candidateTask);
+                    let bestDiff = Math.abs(opt.totalDistanceKm - targetDistanceKm);
+
+                    let isFine = false;
+                    // If discrete 2-sig-fig radius misses tolerance, refine with binary search in 100m steps
+                    if (bestDiff > toleranceKm) {
+                        let low = 400, high = 50000;
+                        for (let step = 0; step < 16; step++) {
+                            const mid = Math.round(((low + high) / 2) / 100) * 100;
+                            if (mid < 400) { low = 400; continue; }
+                            candidateTask[idx].radius = mid;
+                            const testOpt = optimizeTaskRoute(candidateTask);
+                            const curDiff = testOpt.totalDistanceKm - targetDistanceKm;
+                            if (Math.abs(curDiff) < bestDiff) {
+                                bestDiff = Math.abs(curDiff);
+                                bestR = mid;
+                                opt = testOpt;
+                            }
+                            if (curDiff > 0) low = mid + 100;
+                            else high = mid - 100;
+                        }
+                        candidateTask[idx].radius = bestR;
+                        if (bestR !== discreteR && roundTo2SigFigs(bestR) !== bestR) {
+                            isFine = true;
+                        }
                     }
                 }
             }
@@ -395,7 +438,13 @@ export function solveRandomizedTask({
             const diff = Math.abs(opt.totalDistanceKm - targetDistanceKm);
             if (diff <= toleranceKm) {
                 if (!isCandidateTooSimilar(opt)) {
-                    validSolutions.push({ turnpoints: candidateTask, optimized: opt, diffKm: diff, signature: sig });
+                    const hasNon2SigFig = candidateTask.some(t => t.radius && roundTo2SigFigs(t.radius) !== t.radius);
+                    const sol = { turnpoints: candidateTask, optimized: opt, diffKm: diff, signature: sig };
+                    if (hasNon2SigFig) {
+                        fineSolutions.push(sol);
+                    } else {
+                        validSolutions.push(sol);
+                    }
                     if (validSolutions.length >= 6) break;
                 }
             } else {
@@ -440,7 +489,7 @@ export function solveRandomizedTask({
 
             const dStartGoal = vincentyDistance(candidateTask[0].waypoint, candidateTask[N - 1].waypoint);
             const isTaskOutAndReturn = dStartGoal < targetDistanceKm * 0.35 * 1000;
-            const currentMaxDeflection = isTaskOutAndReturn ? 178 : 160;
+            const currentMaxDeflection = isTaskOutAndReturn ? 180 : 160;
 
             // Track waypoint occurrences across the task
             const idCounts = new Map();
@@ -574,6 +623,29 @@ export function solveRandomizedTask({
                         }
                     }
 
+                    let isFine = false;
+                    // If discrete 2-sig-fig radius misses tolerance, refine with binary search in 100m steps
+                    if (bestDiff > toleranceKm) {
+                        let low = 400, high = 50000;
+                        for (let step = 0; step < 16; step++) {
+                            const mid = Math.round(((low + high) / 2) / 100) * 100;
+                            if (mid < 400) { low = 400; continue; }
+                            candidateTask[idx].radius = mid;
+                            const testOpt = optimizeTaskRoute(candidateTask);
+                            const curDiff = testOpt.totalDistanceKm - targetDistanceKm;
+                            if (Math.abs(curDiff) < bestDiff) {
+                                bestDiff = Math.abs(curDiff);
+                                bestR = mid;
+                                bestOpt = testOpt;
+                            }
+                            if (curDiff > 0) low = mid + 100;
+                            else high = mid - 100;
+                        }
+                        if (bestR !== baseR && roundTo2SigFigs(bestR) !== bestR) {
+                            isFine = true;
+                        }
+                    }
+
                     candidateTask[idx].radius = bestR;
                     opt = bestOpt;
                     remainingOvershootMeters = (opt.totalDistanceKm - targetDistanceKm) * 1000;
@@ -583,7 +655,13 @@ export function solveRandomizedTask({
             let diff = Math.abs(opt.totalDistanceKm - targetDistanceKm);
             if (diff <= toleranceKm) {
                 if (!isCandidateTooSimilar(opt)) {
-                    validSolutions.push({ turnpoints: candidateTask, optimized: opt, diffKm: diff, signature: candidateSignature });
+                    const hasNon2SigFig = candidateTask.some(t => t.radius && roundTo2SigFigs(t.radius) !== t.radius);
+                    const sol = { turnpoints: candidateTask, optimized: opt, diffKm: diff, signature: candidateSignature };
+                    if (hasNon2SigFig) {
+                        fineSolutions.push(sol);
+                    } else {
+                        validSolutions.push(sol);
+                    }
                     if (validSolutions.length >= 6) break;
                 }
             } else {
@@ -596,8 +674,9 @@ export function solveRandomizedTask({
         }
     }
 
-    if (validSolutions.length > 0) {
-        const chosen = validSolutions[Math.floor(Math.random() * validSolutions.length)];
+    const solutionPool = validSolutions.length > 0 ? validSolutions : fineSolutions;
+    if (solutionPool.length > 0) {
+        const chosen = solutionPool[Math.floor(Math.random() * solutionPool.length)];
         return {
             success: true,
             turnpoints: chosen.turnpoints,

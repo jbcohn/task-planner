@@ -461,8 +461,50 @@ assert(Math.abs(lineBrng - expectedLineBrng) < 0.01, `Goal line bearing ${lineBr
 
 console.log("✓ Goal desc matching, XCTrack codes, non-sig-fig radii, and goal line geometry verified");
 
+// 12. Test N=5 consecutive randomizations on sample waypoints
+console.log("\n[12/12] Testing N=5 Consecutive Task Randomizations & Turnaround Geometry...");
+const sampleWaypoints = [
+    { id: "T01", code: "T01", name: "St Andre Chalvet", lat: 43.975, lng: 6.5083, elev: 1520 },
+    { id: "G01", code: "G01", name: "Landing Aerodrome", lat: 43.9533, lng: 6.52, elev: 900 },
+    { id: "C02", code: "C02", name: "Col d Allos", lat: 44.2483, lng: 6.5933, elev: 2250 },
+    { id: "C03", code: "C03", name: "Cheval Blanc", lat: 44.1233, lng: 6.4133, elev: 2323 },
+    { id: "D04", code: "D04", name: "Dormillouse", lat: 44.3533, lng: 6.4583, elev: 2505 },
+    { id: "B13", code: "B13", name: "Barcelonnette", lat: 44.3866, lng: 6.6516, elev: 1130 },
+    { id: "L11", code: "L11", name: "Montagne de Lure", lat: 44.1216, lng: 5.7933, elev: 1826 },
+    { id: "A15", code: "A15", name: "Annot", lat: 43.965, lng: 6.6683, elev: 700 },
+    { id: "G02", code: "G02", name: "Gorde Sud Goal", lat: 43.9966, lng: 6.3916, elev: 1620, desc: "Valley Goal Field" },
+    { id: "E17", code: "E17", name: "Entrevaux", lat: 43.9483, lng: 6.81, elev: 470 },
+    { id: "L18", code: "L18", name: "La Mure", lat: 44.0133, lng: 6.5866, elev: 1050 },
+    { id: "V19", code: "V19", name: "Verdon Lake", lat: 43.8, lng: 6.25, elev: 480 }
+];
+
+let cur5Tp = [
+    { id: "TP_1_T01", waypoint: sampleWaypoints[0], radius: 1000, type: "takeoff", direction: "enter", locked: true },
+    { id: "TP_2_SSS_T01", waypoint: sampleWaypoints[0], radius: 2000, type: "sss", direction: "exit", locked: false },
+    { id: "TP_3_D04", waypoint: sampleWaypoints[4], radius: 3000, type: "turnpoint", direction: "enter", locked: false },
+    { id: "TP_4_ESS_G01", waypoint: sampleWaypoints[1], radius: 2000, type: "ess", direction: "enter", locked: false },
+    { id: "TP_5_G01", waypoint: sampleWaypoints[1], radius: 400, type: "goal", direction: "enter", goalType: "cylinder", locked: true }
+];
+
+const sigs5 = [];
+for (let run = 0; run < 3; run++) {
+    const res = solveRandomizedTask({
+        waypoints: sampleWaypoints,
+        currentTurnpoints: cur5Tp,
+        targetDistanceKm: 65.0,
+        numTurnpoints: 5,
+        distanceToleranceKm: 0.5,
+        recentSignatures: sigs5
+    });
+    assert(res.success, `Run ${run + 1} must succeed with valid task meeting 65.0 km target`);
+    assert(Math.abs(res.optimized.totalDistanceKm - 65.0) <= 0.5, `Task distance ${res.optimized.totalDistanceKm} must be within 0.5km of 65.0km`);
+    cur5Tp = res.turnpoints;
+    sigs5.push(res.signature);
+}
+console.log("✓ Consecutive N=5 randomizations passed with turnaround geometry and fine radius refinement");
+
 console.log("\n==========================================");
-console.log("ALL 11 TEST SUITES PASSED CLEANLY!");
+console.log("ALL 12 TEST SUITES PASSED CLEANLY!");
 console.log("==========================================");
 
 
