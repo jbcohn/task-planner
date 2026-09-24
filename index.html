@@ -186,9 +186,9 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>🏁 Goal (Code starts with 'G'):</label>
+                    <label>🏁 Goal ('G' code or 'goal' in desc):</label>
                     <div style="display: flex; gap: 8px; margin-bottom: 6px;">
-                        <input type="text" id="goal-search-input" class="form-control" placeholder="🔍 Search G-waypoint..." style="flex: 2; padding: 4px 8px; font-size: 12px;">
+                        <input type="text" id="goal-search-input" class="form-control" placeholder="🔍 Search Goal waypoint..." style="flex: 2; padding: 4px 8px; font-size: 12px;">
                         <select id="goal-sort-select" class="form-control" style="flex: 1; padding: 4px 6px; font-size: 12px;">
                             <option value="alpha">Code A-Z</option>
                             <option value="dist">Dist from Launch</option>
@@ -262,6 +262,32 @@
                         <div style="display: flex; gap: 8px;">
                             <button class="btn-secondary" id="btn-export-xctsk" style="flex: 1;">Save .xctsk</button>
                             <button class="btn-secondary" id="btn-export-cup" style="flex: 1;">Export .cup</button>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 14px; padding: 12px; background: #151a1f; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-weight: 700; font-size: 13px; color: var(--text-primary);">☁️ XContest Cloud Task</span>
+                            <span id="xcontest-status-badge" style="font-size: 11px; color: var(--text-secondary);">Ready</span>
+                        </div>
+                        <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.4;">
+                            Upload to XContest Cloud to get a 4-letter task code for quick input into XCTrack.
+                        </p>
+                        <button class="btn-primary" id="btn-upload-xcontest" style="width: 100%; padding: 9px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                            <span>☁️ Upload to XContest</span>
+                        </button>
+                        <div id="xcontest-result-container" style="display: none; margin-top: 10px; padding: 10px; background: #0f1418; border-radius: 6px; border: 1px solid var(--accent-blue);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Task Code:</span>
+                                <a id="xcontest-web-link" href="#" target="_blank" rel="noopener noreferrer" style="font-size: 11px; color: var(--accent-blue); text-decoration: underline;">Open in XContest ↗</a>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div id="xcontest-task-code" style="font-size: 24px; font-family: monospace; font-weight: 800; letter-spacing: 4px; color: #38bdf8; background: #1a222d; padding: 4px 12px; border-radius: 4px; flex: 1; text-align: center;">----</div>
+                                <button class="btn-secondary" id="btn-copy-task-code" style="padding: 6px 12px; font-size: 12px; white-space: nowrap;">📋 Copy</button>
+                            </div>
+                            <div style="margin-top: 6px; font-size: 11px; color: #86efac; text-align: center;">
+                                In XCTrack: Menu ➔ Navigation ➔ Cloud ➔ enter code
+                            </div>
                         </div>
                     </div>
                 </div>

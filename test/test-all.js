@@ -1,6 +1,6 @@
 // task-planner/test/test-all.js
 import assert from 'node:assert';
-import { vincentyDistance, vincentyBearing, vincentyDestination, deflectionAngle, roundTo2SigFigs, getDiscrete2SigFigValues, calculatePolylineOverlapPercent } from '../js/geo-math.js';
+import { vincentyDistance, vincentyBearing, vincentyDestination, deflectionAngle, roundTo2SigFigs, getDiscrete2SigFigValues, calculatePolylineOverlapPercent, formatRadiusDisplay } from '../js/geo-math.js';
 import { parseCup } from '../js/parsers/cup-parser.js';
 import { parseWpt } from '../js/parsers/wpt-parser.js';
 import { optimizeTaskRoute } from '../js/optimizer/task-optimizer.js';
@@ -385,8 +385,84 @@ assert.strictEqual(mapCtrl.isColorDark('#ffffff'), false, "#ffffff is light (nee
 
 console.log("✓ Topo/terrain base layers (OpenTopoMap default), label cycling, and waypoint removal logic verified");
 
+// 11. Goal Description Matching, XCTrack QR Codes, Exact Stepped Radii & Goal Line Geometry
+console.log("\n[11/11] Testing Goal Desc Match, XCTrack Codes, Non-Sig-Fig Radii & Goal Line...");
+
+// 1. Goal Description matching (waypoints without 'G' code but 'goal' in description)
+const launchWp = { id: "T01", code: "T01", name: "Launch", lat: 43.7, lng: 6.1, elev: 1500 };
+const goalDescWp = { id: "L99", code: "L99", name: "Thorame LZ", lat: 44.2, lng: 6.6, elev: 950, desc: "Official Competition Goal" };
+const allWpsWithGoalDesc = [launchWp, goalDescWp, ...gridWps];
+const solverGoalDescRes = solveRandomizedTask({
+    waypoints: allWpsWithGoalDesc,
+    targetDistanceKm: 70.0,
+    numTurnpoints: 4,
+    maxAttempts: 300
+});
+assert(solverGoalDescRes.success, "Solver should successfully create task using waypoint with 'goal' in desc");
+const solvedGoalWp = solverGoalDescRes.turnpoints[solverGoalDescRes.turnpoints.length - 1].waypoint;
+assert.strictEqual(solvedGoalWp.id, "L99", "Waypoint L99 with 'goal' in desc should be selected as Goal");
+
+// 2. Exact Stepped Radii & formatRadiusDisplay without 2-sig-fig limits
+assert.strictEqual(formatRadiusDisplay(450), "450m");
+assert.strictEqual(formatRadiusDisplay(1200), "1.2km");
+assert.strictEqual(formatRadiusDisplay(1234), "1.234km");
+assert.strictEqual(formatRadiusDisplay(12300), "12.3km");
+assert.strictEqual(formatRadiusDisplay(12345), "12.345km");
+
+// Test TaskSheet stepped radius calculation
+import { TaskSheet } from '../js/ui/task-sheet.js';
+const calcRadius = TaskSheet.prototype.calculateSteppedRadius;
+assert.strictEqual(calcRadius(1234, 100), 1334, "Radius should increment by exact +100m");
+assert.strictEqual(calcRadius(1334, -100), 1234, "Radius should decrement by exact -100m");
+assert.strictEqual(calcRadius(1234, 1000), 2234, "Radius should increment by exact +1km");
+assert.strictEqual(calcRadius(2234, -1000), 1234, "Radius should decrement by exact -1km");
+assert.strictEqual(calcRadius(1234, 10000), 11234, "Radius should increment by exact +10km");
+assert.strictEqual(calcRadius(11234, -10000), 1234, "Radius should decrement by exact -10km");
+
+// 3. Waypoint Code preservation in XCTrack QR (n = wp.code, d = wp.name)
+const customCodeTask = [
+    { waypoint: { id: "W1", code: "T01", name: "St Andre Chalvet", lat: 43.969, lng: 6.520, elev: 1530 }, radius: 1000, type: "takeoff" },
+    { waypoint: { id: "W2", code: "A05", name: "Col de l'Allos", lat: 44.250, lng: 6.590, elev: 2250 }, radius: 2500, type: "turnpoint" },
+    { waypoint: { id: "W3", code: "L02", name: "Thorame Landing", lat: 44.088, lng: 6.575, elev: 980, desc: "Goal LZ" }, radius: 100, type: "goal", goalType: "line" }
+];
+const qrPayload = taskToXcTrackQrString(customCodeTask);
+const qrParsedJson = JSON.parse(qrPayload.substring(6));
+assert.strictEqual(qrParsedJson.t[0].n, "T01", "Field 'n' must contain waypoint code T01");
+assert.strictEqual(qrParsedJson.t[0].d, "St Andre Chalvet", "Field 'd' must contain waypoint name");
+assert.strictEqual(qrParsedJson.t[1].n, "A05", "Field 'n' must contain waypoint code A05");
+assert.strictEqual(qrParsedJson.t[1].d, "Col de l'Allos", "Field 'd' must contain waypoint name");
+assert.strictEqual(qrParsedJson.t[2].n, "L02", "Field 'n' must contain waypoint code L02");
+assert.strictEqual(qrParsedJson.g.t, 1, "Goal type in QR must be 1 (LINE)");
+
+// 4. Goal line optimization geometry
+const optGoalLine = optimizeTaskRoute(customCodeTask);
+const goalTouch = optGoalLine.touchPoints[2];
+assert.strictEqual(goalTouch.lat, customCodeTask[2].waypoint.lat, "Goal line touchpoint must be at waypoint center");
+assert.strictEqual(goalTouch.lng, customCodeTask[2].waypoint.lng, "Goal line touchpoint must be at waypoint center");
+
+// Verify goal line perpendicularity to incoming courseline
+const prevPt = optGoalLine.points[1];
+const goalPt = customCodeTask[2].waypoint;
+const brngIn = vincentyBearing(prevPt, goalPt);
+const halfLen = customCodeTask[2].radius;
+const leftEnd = vincentyDestination(goalPt, halfLen, brngIn - Math.PI / 2);
+const rightEnd = vincentyDestination(goalPt, halfLen, brngIn + Math.PI / 2);
+
+// Distance from leftEnd to rightEnd should be ~2 * halfLen (200m)
+const lineLength = vincentyDistance(leftEnd, rightEnd);
+assert(Math.abs(lineLength - 200) < 0.1, `Goal line length should be 200m, got ${lineLength}`);
+
+// Bearing of goal line from left to right should be exactly brngIn + PI/2 (+/- 0.001 rad)
+const lineBrng = vincentyBearing(leftEnd, rightEnd);
+let expectedLineBrng = brngIn + Math.PI / 2;
+while (expectedLineBrng > Math.PI) expectedLineBrng -= 2 * Math.PI;
+while (expectedLineBrng < -Math.PI) expectedLineBrng += 2 * Math.PI;
+assert(Math.abs(lineBrng - expectedLineBrng) < 0.01, `Goal line bearing ${lineBrng} should match ${expectedLineBrng}`);
+
+console.log("✓ Goal desc matching, XCTrack codes, non-sig-fig radii, and goal line geometry verified");
+
 console.log("\n==========================================");
-console.log("ALL 10 TEST SUITES PASSED CLEANLY!");
+console.log("ALL 11 TEST SUITES PASSED CLEANLY!");
 console.log("==========================================");
 
 

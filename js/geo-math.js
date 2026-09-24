@@ -300,14 +300,12 @@ export function getDiscrete2SigFigValues(minMeters = 400, maxMeters = 300000) {
  * @returns {string} e.g. "400m", "1.5km", "25km"
  */
 export function formatRadiusDisplay(meters) {
-    if (meters < 1000) {
-        return `${Math.round(meters)}m`;
+    const m = Math.round(meters);
+    if (m < 1000) {
+        return `${m}m`;
     }
-    const km = meters / 1000;
-    if (km < 10) {
-        return `${Number(km.toFixed(2))}km`;
-    }
-    return `${Number(km.toFixed(1))}km`;
+    const km = m / 1000;
+    return `${parseFloat(km.toFixed(3))}km`;
 }
 
 /**

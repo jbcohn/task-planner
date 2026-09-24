@@ -1,4 +1,4 @@
-import { formatRadiusDisplay, roundTo2SigFigs } from '../geo-math.js';
+import { formatRadiusDisplay } from '../geo-math.js';
 
 export class TaskSheet {
     constructor({
@@ -359,15 +359,7 @@ export class TaskSheet {
         let r = (currentR || 400) + step;
         if (r < 100) r = 100;
         if (r > 300000) r = 300000;
-        const absStep = Math.abs(step);
-        if (absStep === 100 && r <= 10000) {
-            return Math.round(r / 100) * 100;
-        } else if (absStep === 1000 && r <= 50000) {
-            return Math.round(r / 1000) * 1000;
-        } else if (absStep === 10000) {
-            return Math.round(r / 10000) * 10000;
-        }
-        return roundTo2SigFigs(r);
+        return Math.round(r);
     }
 
     applyBatchRadiusStep(step) {

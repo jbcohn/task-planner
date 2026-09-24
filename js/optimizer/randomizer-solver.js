@@ -118,7 +118,8 @@ export function solveRandomizedTask({
 
     const goalPool = waypoints.filter(w => {
         const c = (w.code || w.name || '').toUpperCase();
-        return c.startsWith('G');
+        const d = (w.desc || w.description || '').toUpperCase();
+        return c.startsWith('G') || d.includes('GOAL');
     });
     const effectiveGoalPool = goalPool.length > 0 ? goalPool : waypoints;
 

@@ -87,10 +87,9 @@ export function optimizeTaskRoute(turnpoints) {
                     const prevPt = Q[i - 1];
                     const brng = vincentyBearing(center, prevPt);
                     if (tp.goalType === 'line') {
-                        // Goal line: half circle or perpendicular line segment of 100m
-                        // Touch point is towards the previous point
-                        const pt = vincentyDestination(center, Math.min(radiusM, 100), brng);
-                        Q[i] = { lat: pt.lat, lng: pt.lng, index: i };
+                        // Goal line: line segment perpendicular to course line, centered at waypoint
+                        // The shortest route enters at the midpoint (the waypoint center itself)
+                        Q[i] = { lat: center.lat, lng: center.lng, index: i };
                     } else {
                         // Goal cylinder: perimeter point facing prevPt
                         const pt = vincentyDestination(center, radiusM, brng);

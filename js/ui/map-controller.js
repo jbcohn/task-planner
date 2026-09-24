@@ -1,6 +1,6 @@
 // task-planner/js/ui/map-controller.js
 import { createOfflineTileLayer } from '../offline/tile-cache.js';
-import { formatRadiusDisplay } from '../geo-math.js';
+import { formatRadiusDisplay, vincentyBearing, vincentyDestination } from '../geo-math.js';
 
 export const BASE_LAYERS_CONFIG = {
     esritopo: {
@@ -503,7 +503,8 @@ export class MapController {
         const hasFullName = wp.name && wp.name !== displayCode;
         const codeUpper = (wp.code || wp.name || '').toUpperCase();
         const isTakeoffEligible = codeUpper.startsWith('T');
-        const isGoalEligible = codeUpper.startsWith('G');
+        const descUpper = (wp.desc || wp.description || '').toUpperCase();
+        const isGoalEligible = codeUpper.startsWith('G') || descUpper.includes('GOAL');
 
         // Check if this waypoint is currently part of the active task
         const inTaskMatches = (this.currentTurnpoints || []).filter(tp => tp.waypoint && tp.waypoint.id === wp.id);
@@ -630,15 +631,73 @@ export class MapController {
                 labelClass += ' tp-selected';
             }
 
-            const circle = L.circle([wp.lat, wp.lng], {
-                radius: radiusM,
-                color: isSelected ? '#38bdf8' : color,
-                weight: isSelected ? 3.5 : 2,
-                opacity: isSelected ? 1.0 : 0.9,
-                fillColor: color,
-                fillOpacity: isSelected ? 0.25 : 0.12,
-                dashArray: dashArray
-            });
+            const taskShapes = [];
+            const isGoalLine = (type === 'goal' && tp.goalType === 'line');
+
+            if (isGoalLine) {
+                // Goal Line with semicircle perpendicular to incoming courseline
+                let pPrev = null;
+                if (optimized && optimized.points && optimized.points.length >= 2) {
+                    pPrev = optimized.points[optimized.points.length - 2];
+                } else if (idx > 0 && turnpoints[idx - 1] && turnpoints[idx - 1].waypoint) {
+                    pPrev = turnpoints[idx - 1].waypoint;
+                }
+
+                const brngIn = pPrev ? vincentyBearing(pPrev, wp) : 0;
+                const halfLength = radiusM; // In CIVL/XCTrack, radius is half the line length (e.g. 100m for 200m line)
+
+                const leftPt = vincentyDestination(wp, halfLength, brngIn - Math.PI / 2);
+                const rightPt = vincentyDestination(wp, halfLength, brngIn + Math.PI / 2);
+
+                // Semicircle arc extending behind the goal line in the direction of the course
+                const arcPoints = [[leftPt.lat, leftPt.lng]];
+                const numSteps = 24;
+                for (let s = 1; s < numSteps; s++) {
+                    const angle = (brngIn - Math.PI / 2) + (Math.PI * s / numSteps);
+                    const arcPt = vincentyDestination(wp, halfLength, angle);
+                    arcPoints.push([arcPt.lat, arcPt.lng]);
+                }
+                arcPoints.push([rightPt.lat, rightPt.lng]);
+
+                // Semicircle sector polygon
+                const semiPolygon = L.polygon(arcPoints, {
+                    color: isSelected ? '#38bdf8' : color,
+                    weight: isSelected ? 2.5 : 1.5,
+                    dashArray: '4, 4',
+                    fillColor: color,
+                    fillOpacity: isSelected ? 0.28 : 0.16
+                });
+                taskShapes.push(semiPolygon);
+
+                // White high-contrast casing polyline for line visibility over complex satellite/topo
+                const goalLineCasing = L.polyline([[leftPt.lat, leftPt.lng], [rightPt.lat, rightPt.lng]], {
+                    color: '#ffffff',
+                    weight: 6,
+                    opacity: 0.85,
+                    lineCap: 'square'
+                });
+                taskShapes.push(goalLineCasing);
+
+                // Prominent goal line perpendicular to incoming courseline
+                const goalLine = L.polyline([[leftPt.lat, leftPt.lng], [rightPt.lat, rightPt.lng]], {
+                    color: isSelected ? '#38bdf8' : color,
+                    weight: 4,
+                    opacity: 1.0,
+                    lineCap: 'square'
+                });
+                taskShapes.push(goalLine);
+            } else {
+                const circle = L.circle([wp.lat, wp.lng], {
+                    radius: radiusM,
+                    color: isSelected ? '#38bdf8' : color,
+                    weight: isSelected ? 3.5 : 2,
+                    opacity: isSelected ? 1.0 : 0.9,
+                    fillColor: color,
+                    fillOpacity: isSelected ? 0.25 : 0.12,
+                    dashArray: dashArray
+                });
+                taskShapes.push(circle);
+            }
 
             // Center marker
             const centerMarker = L.circleMarker([wp.lat, wp.lng], {
@@ -761,17 +820,10 @@ export class MapController {
 
             centerMarker.bindPopup(tpPopupContent);
             centerMarker.on('click', () => centerMarker.openPopup());
-            circle.on('click', () => centerMarker.openPopup());
-            centerMarker.on('tooltipopen', (e) => {
-                if (e.tooltip && e.tooltip.getElement()) {
-                    e.tooltip.getElement().addEventListener('click', (evt) => {
-                        evt.stopPropagation();
-                        centerMarker.openPopup();
-                    });
-                }
+            taskShapes.forEach(shape => {
+                shape.on('click', () => centerMarker.openPopup());
+                this.taskCylinderLayer.addLayer(shape);
             });
-
-            this.taskCylinderLayer.addLayer(circle);
             this.taskCylinderLayer.addLayer(centerMarker);
         });
 

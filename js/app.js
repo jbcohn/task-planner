@@ -6,7 +6,7 @@ import { optimizeTaskRoute } from './optimizer/task-optimizer.js';
 import { solveRandomizedTask } from './optimizer/randomizer-solver.js';
 import { findCandidateWaypointsForCutPoint } from './optimizer/reverse-cycle.js';
 import { translateFreehandStrokeToTask } from './drawing/freehand-tracer.js';
-import { taskToXcTrackJson, taskToXcTrackQrString, xcTrackJsonToTask, taskToCupString, shareTask, downloadFile } from './qr/xctrack-qr.js';
+import { taskToXcTrackJson, taskToXcTrackQrString, xcTrackJsonToTask, taskToCupString, shareTask, downloadFile, uploadTaskToXContest } from './qr/xctrack-qr.js';
 import { downloadAreaTiles, getOfflineTileCount, clearOfflineTiles } from './offline/tile-cache.js';
 import { MapController } from './ui/map-controller.js';
 import { TaskSheet } from './ui/task-sheet.js';
@@ -447,6 +447,74 @@ class App {
             });
         }
 
+        // XContest Cloud Upload
+        const btnUploadXcontest = document.getElementById('btn-upload-xcontest');
+        const xcontestResultContainer = document.getElementById('xcontest-result-container');
+        const xcontestTaskCode = document.getElementById('xcontest-task-code');
+        const xcontestWebLink = document.getElementById('xcontest-web-link');
+        const xcontestStatusBadge = document.getElementById('xcontest-status-badge');
+        const btnCopyTaskCode = document.getElementById('btn-copy-task-code');
+
+        if (btnUploadXcontest) {
+            btnUploadXcontest.addEventListener('click', async () => {
+                if (!this.state.turnpoints || this.state.turnpoints.length < 2) {
+                    this.showToast('⚠️ Task must have at least 2 turnpoints to upload to XContest', 'warning');
+                    return;
+                }
+
+                const originalHtml = btnUploadXcontest.innerHTML;
+                btnUploadXcontest.disabled = true;
+                btnUploadXcontest.innerHTML = '<span>⏳ Uploading to XContest...</span>';
+                if (xcontestStatusBadge) xcontestStatusBadge.textContent = 'Uploading...';
+
+                try {
+                    const result = await uploadTaskToXContest(this.state.turnpoints, { startTime: "12:00:00Z" });
+                    const code = result.taskCode;
+
+                    if (xcontestResultContainer) xcontestResultContainer.style.display = 'block';
+                    if (xcontestTaskCode) xcontestTaskCode.textContent = code;
+                    if (xcontestWebLink) {
+                        xcontestWebLink.href = `https://tools.xcontest.org/xctsk/load?taskCode=${code}`;
+                    }
+                    if (xcontestStatusBadge) {
+                        xcontestStatusBadge.textContent = 'Uploaded ✓';
+                        xcontestStatusBadge.style.color = '#86efac';
+                    }
+
+                    // Automatically copy code to clipboard
+                    try {
+                        await navigator.clipboard.writeText(code);
+                    } catch (e) {}
+
+                    this.showToast(`☁️ Task uploaded! Code: ${code} (copied to clipboard)`, 'success');
+                } catch (err) {
+                    console.error('XContest upload error:', err);
+                    if (xcontestStatusBadge) {
+                        xcontestStatusBadge.textContent = 'Failed';
+                        xcontestStatusBadge.style.color = '#f87171';
+                    }
+                    this.showToast(`⚠️ XContest upload failed: ${err.message}`, 'error');
+                } finally {
+                    btnUploadXcontest.disabled = false;
+                    btnUploadXcontest.innerHTML = originalHtml;
+                }
+            });
+        }
+
+        if (btnCopyTaskCode && xcontestTaskCode) {
+            btnCopyTaskCode.addEventListener('click', async () => {
+                const code = xcontestTaskCode.textContent.trim();
+                if (code && code !== '----') {
+                    try {
+                        await navigator.clipboard.writeText(code);
+                        this.showToast(`📋 Task code '${code}' copied!`, 'success');
+                    } catch (e) {
+                        this.showToast(`Code: ${code}`);
+                    }
+                }
+            });
+        }
+
         // Camera QR Scanner tab
         const btnTabScan = document.getElementById('tab-btn-scan');
         const btnTabQr = document.getElementById('tab-btn-qr');
@@ -706,8 +774,10 @@ class App {
 
     setGoalWaypoint(wp) {
         const codeUpper = (wp.code || wp.name || '').toUpperCase();
-        if (!codeUpper.startsWith('G')) {
-            this.showToast("⚠️ Only waypoints with codes starting with 'G' can be used for Goals", "warning");
+        const descUpper = (wp.desc || wp.description || '').toUpperCase();
+        const isGoalEligible = codeUpper.startsWith('G') || descUpper.includes('GOAL');
+        if (!isGoalEligible) {
+            this.showToast("⚠️ Only waypoints with codes starting with 'G' or 'goal' in description can be used for Goals", "warning");
             return;
         }
 
@@ -975,7 +1045,15 @@ class App {
         // Filter by code prefix if applicable (e.g. 'T' for takeoff, 'G' for goal)
         let eligible = wps;
         if (codePrefix) {
-            const prefixMatched = wps.filter(w => (w.code || w.name || '').toUpperCase().startsWith(codePrefix));
+            const prefixMatched = wps.filter(w => {
+                const codeUpper = (w.code || w.name || '').toUpperCase();
+                if (codeUpper.startsWith(codePrefix)) return true;
+                if (codePrefix === 'G') {
+                    const descUpper = (w.desc || w.description || '').toUpperCase();
+                    if (descUpper.includes('GOAL')) return true;
+                }
+                return false;
+            });
             if (prefixMatched.length > 0) {
                 eligible = prefixMatched;
             }

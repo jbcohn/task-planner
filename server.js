@@ -1,5 +1,6 @@
 // task-planner/server.js
 import http from 'node:http';
+import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +29,42 @@ const server = http.createServer((req, res) => {
     // Parse URL and sanitize path
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
     let pathname = parsedUrl.pathname;
+
+    // Proxy for XContest Task Upload API (for local development)
+    if (pathname === '/api/xctsk/save' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            const proxyHeaders = {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(body)
+            };
+            if (req.headers['author']) {
+                proxyHeaders['Author'] = req.headers['author'];
+            }
+
+            const proxyReq = https.request('https://tools.xcontest.org/api/xctsk/save', {
+                method: 'POST',
+                headers: proxyHeaders
+            }, proxyRes => {
+                res.writeHead(proxyRes.statusCode, {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                });
+                proxyRes.pipe(res);
+            });
+
+            proxyReq.on('error', err => {
+                res.writeHead(502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                res.end(JSON.stringify({ error: `Proxy error: ${err.message}` }));
+            });
+
+            proxyReq.write(body);
+            proxyReq.end();
+        });
+        return;
+    }
+
     if (pathname === '/' || pathname === '') {
         pathname = '/index.html';
     }

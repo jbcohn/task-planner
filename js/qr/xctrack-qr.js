@@ -74,10 +74,16 @@ export function taskToXcTrackQrString(turnpoints, taskMeta = {}) {
     const t = turnpoints.map((tp, idx) => {
         const wp = tp.waypoint;
         const z = encodeTurnpointCoords(wp.lng, wp.lat, wp.elev, tp.radius);
+        const code = wp.code || wp.name || `TP${idx + 1}`;
         const item = {
             z,
-            n: wp.name || wp.code || `TP${idx + 1}`
+            n: code
         };
+        const desc = (wp.name && wp.name !== code) ? wp.name : (wp.desc || '');
+        if (desc) {
+            item.d = desc;
+        }
+
         const tpType = (tp.type || '').toLowerCase();
         if (tpType === 'sss') {
             item.t = 2; // SSS
@@ -122,33 +128,45 @@ export function taskToXcTrackJson(turnpoints, taskMeta = {}) {
         return JSON.stringify({ taskType: "CLASSIC", version: 1, turnpoints: [] }, null, 2);
     }
 
-    const sssTp = turnpoints.find(tp => tp.type === 'sss') || turnpoints[1] || turnpoints[0];
+    const hasExplicitSss = turnpoints.some(tp => (tp.type || '').toLowerCase() === 'sss');
+    const hasExplicitEss = turnpoints.some(tp => (tp.type || '').toLowerCase() === 'ess');
+    const sssTargetIdx = hasExplicitSss 
+        ? turnpoints.findIndex(tp => (tp.type || '').toLowerCase() === 'sss') 
+        : Math.min(1, turnpoints.length - 1);
+    const essTargetIdx = hasExplicitEss 
+        ? turnpoints.findIndex(tp => (tp.type || '').toLowerCase() === 'ess') 
+        : (turnpoints.length - 1);
+
+    const sssTp = turnpoints[sssTargetIdx] || turnpoints[0];
     const sssDirection = (sssTp && (sssTp.direction || 'exit').toLowerCase() === 'exit') ? 'EXIT' : 'ENTER';
     const goalTp = turnpoints[turnpoints.length - 1];
     const isGoalLine = goalTp && goalTp.goalType === 'line';
 
     const xcTurnpoints = turnpoints.map((tp, idx) => {
         const wp = tp.waypoint;
+        const code = wp.code || wp.name || `TP${idx + 1}`;
+        const desc = (wp.name && wp.name !== code) ? wp.name : (wp.desc || wp.name || "");
+
         const item = {
             radius: Math.round(tp.radius || 400),
             waypoint: {
-                name: wp.name || wp.code || `TP${idx + 1}`,
+                name: code,
                 lat: parseFloat(wp.lat.toFixed(6)),
                 lon: parseFloat(wp.lng.toFixed(6)),
                 altSmoothed: Math.round(wp.elev || 0),
-                description: wp.desc || wp.name || ""
+                description: desc
             }
         };
 
         const tpType = (tp.type || '').toLowerCase();
         if (tpType === 'takeoff' && idx === 0) {
             item.type = "TAKEOFF";
-        } else if (tpType === 'sss') {
+        } else if (idx === sssTargetIdx) {
             item.type = "SSS";
-        } else if (tpType === 'ess') {
+        } else if (idx === essTargetIdx) {
             item.type = "ESS";
         }
-        // Normal turnpoints and goal omit the type field per XCTrack specification
+        // Normal intermediate turnpoints and non-ESS goal omit the type field per XCTrack specification
 
         return item;
     });
@@ -384,4 +402,60 @@ export function downloadFile(content, filename, mimeType = "text/plain") {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }, 100);
+}
+
+/**
+ * Uploads task directly to XContest Cloud (https://tools.xcontest.org/api/xctsk/save).
+ * Returns { taskCode, taskHash } where taskCode is a 4-letter alphanumeric string.
+ * 
+ * @param {Array<Object>} turnpoints - Task turnpoints
+ * @param {Object} [taskMeta] - Optional metadata (startTime, windowOpen, windowClose)
+ * @param {string} [author] - Optional author identifier (ASCII only)
+ * @returns {Promise<{ taskCode: string, taskHash: string }>}
+ */
+export async function uploadTaskToXContest(turnpoints, taskMeta = {}, author = 'PG Task Planner') {
+    if (!turnpoints || turnpoints.length === 0) {
+        throw new Error("Cannot upload empty task");
+    }
+
+    const jsonStr = taskToXcTrackJson(turnpoints, taskMeta);
+    const cleanAuthor = String(author || 'PG Task Planner').replace(/[^\x20-\x7E]/g, '');
+
+    const headers = {
+        'Content-Type': 'application/json',
+        'Author': cleanAuthor
+    };
+
+    let response;
+    try {
+        // Try direct call to XContest (CORS enabled on tools.xcontest.org)
+        response = await fetch('https://tools.xcontest.org/api/xctsk/save', {
+            method: 'POST',
+            headers: headers,
+            body: jsonStr
+        });
+    } catch (directErr) {
+        // If direct call fails (e.g. localhost environment), try local proxy
+        try {
+            response = await fetch('/api/xctsk/save', {
+                method: 'POST',
+                headers: headers,
+                body: jsonStr
+            });
+        } catch (proxyErr) {
+            throw new Error(`Connection to XContest failed: ${directErr.message || directErr}`);
+        }
+    }
+
+    if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        throw new Error(`XContest returned error ${response.status}: ${errText || response.statusText}`);
+    }
+
+    const data = await response.json();
+    if (!data.taskCode) {
+        throw new Error("XContest response did not include a taskCode");
+    }
+
+    return data;
 }
