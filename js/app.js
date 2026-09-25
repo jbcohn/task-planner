@@ -10,6 +10,7 @@ import { taskToXcTrackJson, taskToXcTrackQrString, xcTrackJsonToTask, taskToCupS
 import { downloadAreaTiles, getOfflineTileCount, clearOfflineTiles } from './offline/tile-cache.js';
 import { MapController } from './ui/map-controller.js';
 import { TaskSheet } from './ui/task-sheet.js';
+import { RRWO_CUP_DATA } from './default-waypoints.js';
 
 class App {
     constructor() {
@@ -59,7 +60,6 @@ class App {
             onSetGoalWaypoint: (wp) => this.setGoalWaypoint(wp),
             onCutPointSelected: (idx, cutPoint) => this.handleCutPointSelected(idx, cutPoint),
             onFreehandStrokeComplete: (stroke) => this.handleFreehandComplete(stroke),
-            onToggleTurnpointSelection: (idx) => this.toggleTurnpointSelection(idx),
             onRemoveTurnpoint: (idx) => this.removeTurnpoint(idx),
             onFocusTurnpoint: (idx) => this.taskSheet.setFocusedTurnpoint(idx)
         });
@@ -73,8 +73,7 @@ class App {
             onReorderTurnpoints: (fromIdx, toIdx) => this.reorderTurnpoints(fromIdx, toIdx),
             onRandomizeSingleTurnpoint: (idx) => this.runRandomizerSolver(idx),
             onApplyCandidateTurnpoint: (idx, wp, radius) => this.applyCandidateTurnpoint(idx, wp, radius),
-            onSetTurnpoints: (turnpoints, selectedIndices) => this.setAllTurnpoints(turnpoints, selectedIndices),
-            onSelectionChange: (selectedIndices) => this.handleSelectionChange(selectedIndices),
+            onSetTurnpoints: (turnpoints) => this.setAllTurnpoints(turnpoints),
             onOpenCutPointAlternatives: (idx) => this.openCutPointAlternativesForTurnpoint(idx),
             onCloseCutPointAlternatives: () => this.mapController.clearActiveCutPoint(),
             onFocusTurnpoint: (idx) => this.handleFocusTurnpoint(idx),
@@ -877,26 +876,9 @@ class App {
         this.updateTaskDistances(true, true);
     }
 
-    toggleTurnpointSelection(idx) {
-        if (!this.taskSheet) return;
-        if (this.taskSheet.selectedIndices.has(idx)) {
-            this.taskSheet.selectedIndices.delete(idx);
-        } else {
-            this.taskSheet.selectedIndices.add(idx);
-        }
-        this.taskSheet.handleSelectionUpdated();
-    }
-
-    setAllTurnpoints(turnpoints, selectedIndices) {
+    setAllTurnpoints(turnpoints) {
         this.state.turnpoints = turnpoints;
-        if (selectedIndices) {
-            this.mapController.setSelectedTurnpoints(selectedIndices);
-        }
         this.updateTaskDistances(true, true);
-    }
-
-    handleSelectionChange(selectedIndices) {
-        this.mapController.setSelectedTurnpoints(selectedIndices);
     }
 
     handleFocusTurnpoint(idx) {
@@ -1265,44 +1247,20 @@ class App {
     }
 
     loadSampleWaypoints() {
-        const sampleCup = `
-"name","code","country","lat","lon","elev","style","rwdir","rwlen","rwwidth","freq","desc"
-"St Andre Chalvet","T01",FR,4358.150N,00631.200E,1530m,1,,,,,"Main Takeoff West"
-"Landing Aerodrome","G01",FR,4357.500N,00630.100E,910m,1,,,,,"Official Goal Landing"
-"Col des Robines","B02",FR,4358.900N,00633.400E,1480m,1,,,,,"Pass East"
-"Chamatte Sud","C03",FR,4355.200N,00632.000E,1870m,1,,,,,"South Ridge"
-"Dormillouse","D04",FR,4412.500N,00620.000E,2505m,1,,,,,"North Big Turnpoint"
-"Col d Allos","A05",FR,4415.000N,00635.400E,2250m,1,,,,,"Pass North East"
-"Cheval Blanc","E06",FR,4407.200N,00628.100E,2323m,1,,,,,"High Mountain Turn"
-"Coupe","F07",FR,4403.500N,00631.800E,1750m,1,,,,,"Local Ridge"
-"Thorame Haute Takeoff","T02",FR,4405.300N,00634.500E,1650m,1,,,,,"North Launch"
-"Pic de Rent","P09",FR,4402.000N,00626.500E,1996m,1,,,,,"West Ridge"
-"Mourre de Chanier","M10",FR,4352.000N,00624.000E,1930m,1,,,,,"South West Corner"
-"Montagne de Lure","L11",FR,4407.000N,00547.000E,1826m,1,,,,,"Far West Outlying"
-"Castellane","C12",FR,4350.800N,00630.700E,724m,1,,,,,"South River Gate"
-"Barcelonnette","B13",FR,4423.200N,00639.100E,1135m,1,,,,,"North Valley"
-"Puget Theniers","P14",FR,4357.400N,00653.800E,410m,1,,,,,"East River Valley"
-"Annot","A15",FR,4357.900N,00640.100E,700m,1,,,,,"East Village"
-"Gorde Sud Goal","G02",FR,4359.800N,00623.500E,1620m,1,,,,,"Valley Goal Field"
-"Entrevaux","E17",FR,4356.900N,00648.600E,470m,1,,,,,"Citadel Landing"
-"La Mure","L18",FR,4400.800N,00635.200E,1050m,1,,,,,"Intermediate Pass"
-"Verdon Lake","V19",FR,4348.000N,00615.000E,480m,1,,,,,"Lake South Gate"
-`;
-
-        const parsed = parseCup(sampleCup);
+        const parsed = parseCup(RRWO_CUP_DATA);
         this.state.waypoints = parsed.waypoints;
         this.mapController.renderWaypoints(this.state.waypoints);
 
-        const wpT01 = this.state.waypoints.find(w => w.code === 'T01') || this.state.waypoints[0];
-        const wpG01 = this.state.waypoints.find(w => w.code === 'G01') || this.state.waypoints[1];
-        const wpD04 = this.state.waypoints.find(w => w.code === 'D04') || this.state.waypoints[4];
+        const wpT04 = this.state.waypoints.find(w => w.code === 'T04') || this.state.waypoints[0];
+        const wpP10 = this.state.waypoints.find(w => w.code === 'P10') || this.state.waypoints[1];
+        const wpG09 = this.state.waypoints.find(w => w.code === 'G09') || this.state.waypoints[2];
 
         this.state.turnpoints = [
-            { id: 'TP_1_T01', waypoint: wpT01, radius: 1000, type: 'takeoff', direction: 'enter', locked: true },
-            { id: 'TP_2_SSS_T01', waypoint: wpT01, radius: 2000, type: 'sss', direction: 'exit', locked: false },
-            { id: 'TP_3_D04', waypoint: wpD04, radius: 3000, type: 'turnpoint', direction: 'enter', locked: false },
-            { id: 'TP_4_ESS_G01', waypoint: wpG01, radius: 2000, type: 'ess', direction: 'enter', locked: false },
-            { id: 'TP_5_G01', waypoint: wpG01, radius: 400, type: 'goal', direction: 'enter', goalType: 'cylinder', locked: true }
+            { id: 'TP_1_T04', waypoint: wpT04, radius: 1000, type: 'takeoff', direction: 'enter', locked: true },
+            { id: 'TP_2_SSS_T04', waypoint: wpT04, radius: 2000, type: 'sss', direction: 'exit', locked: false },
+            { id: 'TP_3_P10', waypoint: wpP10, radius: 1000, type: 'turnpoint', direction: 'enter', locked: false },
+            { id: 'TP_4_ESS_G09', waypoint: wpG09, radius: 2000, type: 'ess', direction: 'enter', locked: false },
+            { id: 'TP_5_G09', waypoint: wpG09, radius: 400, type: 'goal', direction: 'enter', goalType: 'cylinder', locked: true }
         ];
 
         this.updateTaskDistances(true, true);

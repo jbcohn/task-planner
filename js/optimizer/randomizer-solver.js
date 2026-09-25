@@ -79,14 +79,20 @@ export function solveRandomizedTask({
         }
     }
 
+    const isSingleTarget = targetIndex !== null && targetIndex !== undefined;
+
+    // In single-target randomization, 4 out of 5 legs are identical to the current task,
+    // so overlap against current task will naturally be 65-85%. Relax threshold or bypass for single target.
+    const effectiveMaxOverlap = isSingleTarget ? Math.max(maxOverlap, 96) : maxOverlap;
+
     function isCandidateTooSimilar(candOpt) {
-        if (maxOverlap >= 100 || !candOpt || !candOpt.points || candOpt.points.length < 2) {
+        if (effectiveMaxOverlap >= 100 || !candOpt || !candOpt.points || candOpt.points.length < 2) {
             return false;
         }
         for (const prevPoints of previousTasksToCompare) {
             if (prevPoints && prevPoints.length >= 2) {
                 const overlap = calculatePolylineOverlapPercent(candOpt.points, prevPoints);
-                if (overlap >= maxOverlap) {
+                if (overlap >= effectiveMaxOverlap) {
                     return true;
                 }
             }
@@ -96,7 +102,6 @@ export function solveRandomizedTask({
 
     // Build the slot template
     const template = [];
-    const isSingleTarget = targetIndex !== null && targetIndex !== undefined;
 
     // Identify designated or existing launch (takeoff) and goal turnpoints
     const launchTp = (currentTurnpoints && currentTurnpoints.length > 0)

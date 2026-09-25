@@ -1,5 +1,5 @@
 // task-planner/sw.js
-const CACHE_NAME = 'pg-task-planner-v8';
+const CACHE_NAME = 'pg-task-planner-v9';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -12,6 +12,7 @@ const ASSETS_TO_CACHE = [
     './lib/qrcode.min.js',
     './lib/html5-qrcode.min.js',
     './js/app.js',
+    './js/default-waypoints.js',
     './js/geo-math.js',
     './js/parsers/cup-parser.js',
     './js/parsers/wpt-parser.js',

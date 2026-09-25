@@ -9,7 +9,6 @@ export class TaskSheet {
         onRandomizeSingleTurnpoint,
         onApplyCandidateTurnpoint,
         onSetTurnpoints,
-        onSelectionChange,
         onOpenCutPointAlternatives,
         onCloseCutPointAlternatives,
         onFocusTurnpoint,
@@ -22,14 +21,12 @@ export class TaskSheet {
         this.onRandomizeSingleTurnpoint = onRandomizeSingleTurnpoint;
         this.onApplyCandidateTurnpoint = onApplyCandidateTurnpoint;
         this.onSetTurnpoints = onSetTurnpoints;
-        this.onSelectionChange = onSelectionChange;
         this.onOpenCutPointAlternatives = onOpenCutPointAlternatives;
         this.onCloseCutPointAlternatives = onCloseCutPointAlternatives;
         this.onFocusTurnpoint = onFocusTurnpoint;
         this.onExitFocus = onExitFocus;
 
         this.turnpoints = [];
-        this.selectedIndices = new Set();
         this.focusedIndex = null;
 
         this.reverseCyclePanel = document.getElementById('reverse-cycle-panel');
@@ -40,7 +37,6 @@ export class TaskSheet {
         this.initialCutPointRadius = null;
 
         this.initReverseCyclePanel();
-        this.initMultiSelectToolbar();
     }
 
     initReverseCyclePanel() {
@@ -75,161 +71,9 @@ export class TaskSheet {
         }
     }
 
-    initMultiSelectToolbar() {
-        const btnSelectAll = document.getElementById('btn-ms-select-all');
-        const btnFocus = document.getElementById('btn-ms-focus');
-        const btnInvert = document.getElementById('btn-ms-invert');
-        const btnReverse = document.getElementById('btn-ms-reverse');
-        const btnDuplicate = document.getElementById('btn-ms-duplicate');
-        const btnLock = document.getElementById('btn-ms-lock');
-        const btnDelete = document.getElementById('btn-ms-delete');
-        const btnClear = document.getElementById('btn-ms-clear');
-
-        if (btnFocus) {
-            btnFocus.addEventListener('click', () => {
-                if (this.selectedIndices.size === 1) {
-                    const idx = Array.from(this.selectedIndices)[0];
-                    this.setFocusedTurnpoint(idx);
-                }
-            });
-        }
-
-        if (btnSelectAll) {
-            btnSelectAll.addEventListener('click', () => {
-                if (this.selectedIndices.size === this.turnpoints.length) {
-                    this.selectedIndices.clear();
-                } else {
-                    this.selectedIndices = new Set(this.turnpoints.map((_, i) => i));
-                }
-                this.handleSelectionUpdated();
-            });
-        }
-
-        if (btnInvert) {
-            btnInvert.addEventListener('click', () => {
-                const next = new Set();
-                for (let i = 0; i < this.turnpoints.length; i++) {
-                    if (!this.selectedIndices.has(i)) next.add(i);
-                }
-                this.selectedIndices = next;
-                this.handleSelectionUpdated();
-            });
-        }
-
-        if (btnReverse) {
-            btnReverse.addEventListener('click', () => {
-                this.reverseSelected();
-            });
-        }
-
-        if (btnDuplicate) {
-            btnDuplicate.addEventListener('click', () => {
-                this.duplicateSelected();
-            });
-        }
-
-        if (btnLock) {
-            btnLock.addEventListener('click', () => {
-                this.toggleLockSelected();
-            });
-        }
-
-        if (btnDelete) {
-            btnDelete.addEventListener('click', () => {
-                this.deleteSelected();
-            });
-        }
-
-        if (btnClear) {
-            btnClear.addEventListener('click', () => {
-                this.selectedIndices.clear();
-                this.handleSelectionUpdated();
-            });
-        }
-    }
-
-    handleSelectionUpdated() {
-        if (this.onSelectionChange) {
-            this.onSelectionChange(new Set(this.selectedIndices));
-        }
-        this.renderSelectionState();
-    }
-
-    reverseSelected() {
-        if (this.selectedIndices.size < 2) return;
-        const sorted = Array.from(this.selectedIndices).sort((a, b) => a - b);
-        const selectedItems = sorted.map(i => this.turnpoints[i]);
-        selectedItems.reverse();
-
-        const updated = [...this.turnpoints];
-        sorted.forEach((origIdx, pos) => {
-            updated[origIdx] = selectedItems[pos];
-        });
-
-        if (this.onSetTurnpoints) {
-            this.onSetTurnpoints(updated, this.selectedIndices);
-        }
-    }
-
-    duplicateSelected() {
-        if (this.selectedIndices.size === 0) return;
-        const updated = [];
-        const newSelection = new Set();
-
-        this.turnpoints.forEach((tp, idx) => {
-            updated.push(tp);
-            if (this.selectedIndices.has(idx)) {
-                const dup = JSON.parse(JSON.stringify(tp));
-                dup.id = `TP_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-                // If duplicating takeoff/goal, set type to standard turnpoint unless customized
-                if (dup.type === 'takeoff') {
-                    dup.type = 'turnpoint';
-                    dup.radius = 1000;
-                }
-                updated.push(dup);
-                newSelection.add(updated.length - 1);
-            }
-        });
-
-        this.selectedIndices = newSelection;
-        if (this.onSetTurnpoints) {
-            this.onSetTurnpoints(updated, this.selectedIndices);
-        }
-    }
-
-    toggleLockSelected() {
-        if (this.selectedIndices.size === 0) return;
-        const hasUnlocked = Array.from(this.selectedIndices).some(i => !this.turnpoints[i].locked);
-        const shouldLock = hasUnlocked;
-        const updated = this.turnpoints.map((tp, idx) => {
-            if (this.selectedIndices.has(idx)) {
-                return { ...tp, locked: shouldLock };
-            }
-            return tp;
-        });
-        if (this.onSetTurnpoints) {
-            this.onSetTurnpoints(updated, this.selectedIndices);
-        }
-    }
-
-    deleteSelected() {
-        if (this.selectedIndices.size === 0) return;
-        const updated = this.turnpoints.filter((_, idx) => !this.selectedIndices.has(idx));
-        this.selectedIndices.clear();
-        if (this.onSetTurnpoints) {
-            this.onSetTurnpoints(updated, this.selectedIndices);
-        }
-    }
-
-    setSelectedIndices(indices) {
-        this.selectedIndices = new Set(indices);
-        this.renderSelectionState();
-    }
-
     setFocusedTurnpoint(idx) {
         if (idx < 0 || idx >= this.turnpoints.length) return;
         this.focusedIndex = idx;
-        this.selectedIndices = new Set([idx]);
         const bottomSheet = document.getElementById('bottom-sheet');
         if (bottomSheet) bottomSheet.classList.add('sheet-focus-mode');
         if (this.onFocusTurnpoint) {
@@ -248,131 +92,11 @@ export class TaskSheet {
         this.render();
     }
 
-    renderSelectionState() {
-        // Update cards highlight
-        const cards = this.container.querySelectorAll('.tp-card');
-        cards.forEach((card, idx) => {
-            const isSelected = this.selectedIndices.has(idx);
-            card.classList.toggle('selected', isSelected);
-            const chk = card.querySelector('.tp-select-chk');
-            if (chk) chk.checked = isSelected;
-        });
-
-        // Update toolbar
-        const toolbar = document.getElementById('multiselect-toolbar');
-        if (!toolbar) return;
-
-        if (this.selectedIndices.size === 0 || this.focusedIndex !== null) {
-            toolbar.style.display = 'none';
-            return;
-        }
-
-        toolbar.style.display = 'flex';
-        const countEl = document.getElementById('multiselect-count');
-        const sorted = Array.from(this.selectedIndices).sort((a, b) => a - b);
-        const indicesStr = sorted.map(i => `#${i + 1}`).join(', ');
-        if (countEl) {
-            countEl.textContent = `${this.selectedIndices.size} Selected (${indicesStr})`;
-        }
-
-        const btnFocus = document.getElementById('btn-ms-focus');
-        if (btnFocus) {
-            btnFocus.style.display = (this.selectedIndices.size === 1) ? 'inline-flex' : 'none';
-        }
-
-        // Shared Properties Editor
-        const propsEl = document.getElementById('multiselect-props');
-        if (!propsEl) return;
-
-        const selectedTps = sorted.map(i => this.turnpoints[i]);
-        const allCylinders = selectedTps.every(t => !t.goalType || t.goalType === 'cylinder');
-        const allLines = selectedTps.every(t => t.type === 'goal' && t.goalType === 'line');
-
-        if (allCylinders) {
-            const firstR = selectedTps[0].radius || 400;
-            const sameRadius = selectedTps.every(t => (t.radius || 400) === firstR);
-            const displayR = sameRadius ? formatRadiusDisplay(firstR) : 'Mixed';
-
-            propsEl.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                    <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Batch Radius:</span>
-                    <span class="radius-badge" id="batch-radius-badge">${displayR}</span>
-                </div>
-                <div class="quick-radius-row" style="margin-bottom: 6px;">
-                    <div class="radius-chip ${sameRadius && firstR === 400 ? 'active' : ''}" data-radius="400">400m</div>
-                    <div class="radius-chip ${sameRadius && firstR === 1000 ? 'active' : ''}" data-radius="1000">1km</div>
-                    <div class="radius-chip ${sameRadius && firstR === 2000 ? 'active' : ''}" data-radius="2000">2km</div>
-                    <div class="radius-chip ${sameRadius && firstR === 5000 ? 'active' : ''}" data-radius="5000">5km</div>
-                    <div class="radius-chip ${sameRadius && firstR === 10000 ? 'active' : ''}" data-radius="10000">10km</div>
-                    <div class="radius-chip ${sameRadius && firstR === 50000 ? 'active' : ''}" data-radius="50000">50km</div>
-                    <div class="radius-chip ${sameRadius && firstR === 100000 ? 'active' : ''}" data-radius="100000">100km</div>
-                </div>
-                <div class="radius-stepper-row">
-                    <button type="button" class="radius-step-btn" data-step="-100" title="Decrease radius by 100 m">-100m</button>
-                    <button type="button" class="radius-step-btn" data-step="100" title="Increase radius by 100 m">+100m</button>
-                    <button type="button" class="radius-step-btn" data-step="-1000" title="Decrease radius by 1 km">-1km</button>
-                    <button type="button" class="radius-step-btn" data-step="1000" title="Increase radius by 1 km">+1km</button>
-                    <button type="button" class="radius-step-btn" data-step="-10000" title="Decrease radius by 10 km">-10km</button>
-                    <button type="button" class="radius-step-btn" data-step="10000" title="Increase radius by 10 km">+10km</button>
-                </div>
-            `;
-
-            propsEl.querySelectorAll('.radius-chip').forEach(chip => {
-                chip.addEventListener('click', () => {
-                    const r = parseInt(chip.getAttribute('data-radius'), 10);
-                    this.applyBatchRadius(r);
-                });
-            });
-
-            propsEl.querySelectorAll('.radius-step-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const step = parseInt(btn.getAttribute('data-step'), 10);
-                    this.applyBatchRadiusStep(step);
-                });
-            });
-        } else if (allLines) {
-            propsEl.innerHTML = `
-                <div style="font-size: 11px; color: var(--text-secondary);">All selected are Goal Lines (fixed width 200m).</div>
-            `;
-        } else {
-            propsEl.innerHTML = `
-                <div style="font-size: 11px; color: var(--text-secondary); font-style: italic;">
-                    Mixed geometry (Cylinders & Goal Line) - geometry properties cannot be batch-edited.
-                </div>
-            `;
-        }
-    }
-
-    applyBatchRadius(newRadius) {
-        const updated = this.turnpoints.map((tp, idx) => {
-            if (this.selectedIndices.has(idx)) {
-                return { ...tp, radius: newRadius };
-            }
-            return tp;
-        });
-        if (this.onSetTurnpoints) {
-            this.onSetTurnpoints(updated, this.selectedIndices);
-        }
-    }
-
     calculateSteppedRadius(currentR, step) {
         let r = (currentR || 400) + step;
         if (r < 100) r = 100;
         if (r > 300000) r = 300000;
         return Math.round(r);
-    }
-
-    applyBatchRadiusStep(step) {
-        const updated = this.turnpoints.map((tp, idx) => {
-            if (this.selectedIndices.has(idx) && tp.goalType !== 'line') {
-                const nextR = this.calculateSteppedRadius(tp.radius, step);
-                return { ...tp, radius: nextR };
-            }
-            return tp;
-        });
-        if (this.onSetTurnpoints) {
-            this.onSetTurnpoints(updated, this.selectedIndices);
-        }
     }
 
     showReverseCycle(turnpointIndex, candidates, initialWp, initialRadius) {
@@ -450,13 +174,6 @@ export class TaskSheet {
         }
         if (!this.container) return;
 
-        // Prune out-of-range selected indices
-        for (const idx of Array.from(this.selectedIndices)) {
-            if (idx >= this.turnpoints.length) {
-                this.selectedIndices.delete(idx);
-            }
-        }
-
         if (this.focusedIndex !== null && (this.focusedIndex < 0 || this.focusedIndex >= this.turnpoints.length)) {
             this.focusedIndex = null;
         }
@@ -475,7 +192,6 @@ export class TaskSheet {
                     <p style="font-size: 12px;">Upload a waypoint file (.cup or .wpt), tap waypoints on the map, or draw a freehand path.</p>
                 </div>
             `;
-            this.renderSelectionState();
             return;
         }
 
@@ -513,8 +229,7 @@ export class TaskSheet {
             const tp = this.turnpoints[idx];
             const wp = tp.waypoint;
             const card = document.createElement('div');
-            const isSelected = this.selectedIndices.has(idx);
-            card.className = `tp-card ${isSelected ? 'selected' : ''}`;
+            card.className = 'tp-card';
 
             const badgeClass = (tp.type || 'turnpoint').toLowerCase();
             const radiusM = tp.radius || 400;
@@ -526,7 +241,6 @@ export class TaskSheet {
             card.innerHTML = `
                 <div class="tp-row-main">
                     <div class="tp-info">
-                        <input type="checkbox" class="tp-select-chk" data-index="${idx}" ${isSelected ? 'checked' : ''}>
                         <div class="tp-badge ${badgeClass}">#${idx + 1}</div>
                         <div>
                             <div class="tp-name">
@@ -586,29 +300,6 @@ export class TaskSheet {
                     <button type="button" class="radius-step-btn" data-step="10000" title="Increase radius by 10 km">+10km</button>
                 </div>
             `;
-
-            // Selection Checkbox
-            const chk = card.querySelector('.tp-select-chk');
-            chk.addEventListener('change', (e) => {
-                e.stopPropagation();
-                if (e.target.checked) {
-                    this.selectedIndices.add(idx);
-                } else {
-                    this.selectedIndices.delete(idx);
-                }
-                this.handleSelectionUpdated();
-            });
-
-            // Card click selection (if not clicking on interactive child elements)
-            card.addEventListener('click', (e) => {
-                if (['BUTTON', 'SELECT', 'INPUT'].includes(e.target.tagName)) return;
-                if (this.selectedIndices.has(idx)) {
-                    this.selectedIndices.delete(idx);
-                } else {
-                    this.selectedIndices.add(idx);
-                }
-                this.handleSelectionUpdated();
-            });
 
             // Focus button
             const focusBtn = card.querySelector(`#btn-focus-tp-${idx}`);
@@ -735,7 +426,5 @@ export class TaskSheet {
 
             this.container.appendChild(card);
         });
-
-        this.renderSelectionState();
     }
 }

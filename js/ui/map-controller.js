@@ -64,7 +64,6 @@ export class MapController {
         onSetGoalWaypoint, 
         onCutPointSelected, 
         onFreehandStrokeComplete,
-        onToggleTurnpointSelection,
         onRemoveTurnpoint,
         onFocusTurnpoint
     }) {
@@ -76,7 +75,6 @@ export class MapController {
         this.onSetGoalWaypoint = onSetGoalWaypoint;
         this.onCutPointSelected = onCutPointSelected;
         this.onFreehandStrokeComplete = onFreehandStrokeComplete;
-        this.onToggleTurnpointSelection = onToggleTurnpointSelection;
         this.onRemoveTurnpoint = onRemoveTurnpoint;
         this.onFocusTurnpoint = onFocusTurnpoint;
 
@@ -100,7 +98,6 @@ export class MapController {
         this.drawCtx = null;
         this.currentStroke = [];
 
-        this.selectedTurnpointIndices = new Set();
         this.activeCutPoint = null;
         this.currentTurnpoints = [];
         this.currentOptimized = null;
@@ -354,13 +351,6 @@ export class MapController {
         return 'opentopo';
     }
 
-    setSelectedTurnpoints(indicesSet) {
-        this.selectedTurnpointIndices = new Set(indicesSet);
-        if (this.currentTurnpoints && this.currentTurnpoints.length > 0) {
-            this.renderTask(this.currentTurnpoints, this.currentOptimized);
-        }
-    }
-
     setActiveCutPoint(idx, cutPoint) {
         this.activeCutPoint = { index: idx, latLng: cutPoint };
         this.renderTouchpoints();
@@ -597,8 +587,6 @@ export class MapController {
             const wp = tp.waypoint;
             centerPoints.push([wp.lat, wp.lng]);
             const radiusM = tp.radius || 400;
-            const isSelected = this.selectedTurnpointIndices.has(idx);
-
             let color = '#0284c7'; // Turnpoint blue
             let dashArray = null;
 
@@ -625,10 +613,6 @@ export class MapController {
                 labelClass += ' tp-goal';
             } else {
                 labelClass += ' tp-turnpoint';
-            }
-
-            if (isSelected) {
-                labelClass += ' tp-selected';
             }
 
             const taskShapes = [];
@@ -661,11 +645,11 @@ export class MapController {
 
                 // Semicircle sector polygon
                 const semiPolygon = L.polygon(arcPoints, {
-                    color: isSelected ? '#38bdf8' : color,
-                    weight: isSelected ? 2.5 : 1.5,
+                    color: color,
+                    weight: 1.5,
                     dashArray: '4, 4',
                     fillColor: color,
-                    fillOpacity: isSelected ? 0.28 : 0.16
+                    fillOpacity: 0.16
                 });
                 taskShapes.push(semiPolygon);
 
@@ -680,7 +664,7 @@ export class MapController {
 
                 // Prominent goal line perpendicular to incoming courseline
                 const goalLine = L.polyline([[leftPt.lat, leftPt.lng], [rightPt.lat, rightPt.lng]], {
-                    color: isSelected ? '#38bdf8' : color,
+                    color: color,
                     weight: 4,
                     opacity: 1.0,
                     lineCap: 'square'
@@ -689,11 +673,11 @@ export class MapController {
             } else {
                 const circle = L.circle([wp.lat, wp.lng], {
                     radius: radiusM,
-                    color: isSelected ? '#38bdf8' : color,
-                    weight: isSelected ? 3.5 : 2,
-                    opacity: isSelected ? 1.0 : 0.9,
+                    color: color,
+                    weight: 2,
+                    opacity: 0.9,
                     fillColor: color,
-                    fillOpacity: isSelected ? 0.25 : 0.12,
+                    fillOpacity: 0.12,
                     dashArray: dashArray
                 });
                 taskShapes.push(circle);
@@ -701,25 +685,12 @@ export class MapController {
 
             // Center marker
             const centerMarker = L.circleMarker([wp.lat, wp.lng], {
-                radius: isSelected ? 7 : 5,
-                fillColor: isSelected ? '#38bdf8' : color,
+                radius: 5,
+                fillColor: color,
                 color: '#ffffff',
-                weight: isSelected ? 2.5 : 2,
+                weight: 2,
                 fillOpacity: 1
             });
-
-            // If selected, draw an additional outer halo
-            if (isSelected) {
-                const selectHalo = L.circleMarker([wp.lat, wp.lng], {
-                    radius: 12,
-                    color: '#38bdf8',
-                    weight: 2,
-                    dashArray: '3, 3',
-                    fillOpacity: 0.15,
-                    fillColor: '#38bdf8'
-                });
-                this.taskCylinderLayer.addLayer(selectHalo);
-            }
 
             const displayCode = wp.code || wp.name;
             const hasFullName = wp.name && wp.name !== displayCode;
@@ -757,7 +728,6 @@ export class MapController {
                     <button class="wp-popup-btn" id="btn-tp-focus-${idx}" style="background: #0284c7; color: #ffffff; font-weight: 700;">🔍 Focus / Edit Radius</button>
                     ${isIntermediate ? `<button class="wp-popup-btn wp-btn-cutpoint" id="btn-tp-cutpoint-${idx}">🎯 Touchpoint Alternatives</button>` : ''}
                     <button class="wp-popup-btn wp-btn-add" id="btn-tp-add-again-${idx}">+ Add Waypoint Again</button>
-                    <button class="wp-popup-btn" style="background: #2a333d;" id="btn-tp-select-toggle-${idx}">${isSelected ? '✓ Deselect' : '☑️ Select'}</button>
                     <button class="wp-popup-btn wp-btn-remove" id="btn-tp-remove-${idx}">🗑️ Remove from Task</button>
                 </div>
             `;
@@ -784,16 +754,6 @@ export class MapController {
                     centerMarker.closePopup();
                     if (this.onAddWaypointToTask) {
                         this.onAddWaypointToTask(wp);
-                    }
-                });
-            }
-
-            const btnSelectToggle = tpPopupContent.querySelector(`#btn-tp-select-toggle-${idx}`);
-            if (btnSelectToggle) {
-                btnSelectToggle.addEventListener('click', () => {
-                    centerMarker.closePopup();
-                    if (this.onToggleTurnpointSelection) {
-                        this.onToggleTurnpointSelection(idx);
                     }
                 });
             }
